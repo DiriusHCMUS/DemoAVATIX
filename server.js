@@ -7,6 +7,7 @@ const mailer = require('./mailer');
 const db = require('./db');  // ← dual-mode DB (Turso cloud hoặc SQLite local)
 
 const app = express();
+app.use(express.json());
 const SECRET = process.env.SECRET || 'avatix-dev-secret-doi-khi-deploy';
 const FEE = 0.05, CAP = 1.1, METHODS = ['momo', 'bank', 'vnpay', 'vietqr'];
 
@@ -371,7 +372,6 @@ route('get', 'history', true, async r => {
 });
 
 // ─── Static + Error handler ───────────────────────────────────────────────────
-app.use(express.json());
 app.use(express.static(__dirname + '/public', { index: 'login.html' }));
 app.use((e, r, s, n) => s.status(e.c || 500).json({ e: e.c ? e.message : 'Lỗi máy chủ' }));
 

@@ -5,81 +5,137 @@ import "./AvaTicket.sol";
 
 /**
  * @title TicketMarketplace
- * @dev Sàn giao dịch sơ cấp và thứ cấp khóa giá trần (Capped Resale)
- * Tự động thực thi Atomic Swap: Tiền về ví người bán, vé sang ví người mua trong 1 transaction duy nhất.
+ * @dev Sàn giao dịch sơ cấp và thứ cấp có giá trần (Capped Resale)
+ * Atomic Swap: Mint vé + thanh toán trong 1 transaction.
+ * Backend (Admin) hoạt động như relayer: gọi hàm thay cho user, record txHash.
  */
 contract TicketMarketplace {
     AvaTicket public ticketContract;
-    address payable public platformTreasury;
-    address payable public organizerTreasury;
+    address public admin;
 
-    uint256 public constant PLATFORM_FEE_BPS = 500;   // 5% phí sàn
-    uint256 public constant MAX_MARKUP_BPS = 11000;   // Giá bán lại tối đa = giá gốc + 10%
+    uint256 public constant PLATFORM_FEE_BPS = 500;  // 5%
+    uint256 public constant MAX_MARKUP_BPS  = 11000; // +10% tối đa
 
     struct ResaleListing {
-        uint256 ticketId;
-        address payable seller;
-        uint256 resalePrice;
-        bool active;
+        uint256  ticketId;
+        uint256  resalePrice; // Giá bán lại (VNĐ * 1000)
+        address  seller;      // Địa chỉ ví người bán
+        bool     active;
     }
 
+    // ticketId => listing
     mapping(uint256 => ResaleListing) public resaleListings;
 
-    event TicketListedForResale(uint256 indexed ticketId, address indexed seller, uint256 price);
-    event AtomicSwapSuccess(uint256 indexed ticketId, address indexed buyer, address indexed seller, uint256 price);
+    // Sự kiện on-chain (phục vụ Snowtrace Explorer demo)
+    event TicketBought(
+        uint256 indexed ticketId,
+        address indexed buyer,
+        uint256 eventId,
+        uint256 price
+    );
+    event TicketListedForResale(
+        uint256 indexed ticketId,
+        address indexed seller,
+        uint256 price
+    );
+    event TicketUnlisted(
+        uint256 indexed ticketId,
+        address indexed seller
+    );
+    event ResalePurchased(
+        uint256 indexed ticketId,
+        address indexed buyer,
+        address indexed seller,
+        uint256 price
+    );
+    event TicketScanned(
+        uint256 indexed ticketId,
+        address indexed scanner,
+        uint256 timestamp
+    );
 
-    constructor(address _ticketContract, address payable _organizerTreasury) {
-        ticketContract = AvaTicket(_ticketContract);
-        platformTreasury = payable(msg.sender);
-        organizerTreasury = _organizerTreasury;
+    modifier onlyAdmin() {
+        require(msg.sender == admin, "Chi Admin duoc goi");
+        _;
     }
 
-    // Mua vé mở bán sơ cấp (Primary Drop)
-    function buyPrimaryTicket(uint256 eventId, string memory seat) external payable returns (uint256) {
-        require(msg.value > 0, "So tien thanh toan phai lon hon 0");
-        uint256 ticketId = ticketContract.mint(msg.sender, eventId, msg.value, seat);
-        organizerTreasury.transfer(msg.value);
+    constructor(address _ticketContract) {
+        ticketContract = AvaTicket(_ticketContract);
+        admin = msg.sender;
+    }
+
+    /// @notice Mua vé sơ cấp — Backend gọi thay user, truyền địa chỉ ví user
+    /// @param buyer   Địa chỉ ví người mua (backend tạo / quản lý)
+    /// @param eventId ID sự kiện (đồng bộ với SQLite)
+    /// @param price   Giá vé (VNĐ * 1000, integer)
+    /// @param seat    Mô tả chỗ ngồi / loại vé
+    /// @return ticketId NFT ticket ID vừa được mint
+    function buyPrimaryTicket(
+        address buyer,
+        uint256 eventId,
+        uint256 price,
+        string memory seat
+    ) external onlyAdmin returns (uint256) {
+        require(buyer != address(0), "Dia chi buyer khong hop le");
+        uint256 ticketId = ticketContract.mint(buyer, eventId, price, seat);
+        emit TicketBought(ticketId, buyer, eventId, price);
         return ticketId;
     }
 
-    // Treo bán lại vé với GIÁ TRẦN <= GIÁ GỐC (Chống phe vé chợ đen)
-    function listResaleTicket(uint256 ticketId, uint256 resalePrice) external {
+    /// @notice Đăng bán lại vé — Backend gọi, kiểm tra giá trần
+    function listResale(
+        uint256 ticketId,
+        address seller,
+        uint256 resalePrice
+    ) external onlyAdmin {
         AvaTicket.TicketData memory t = ticketContract.getTicket(ticketId);
-        require(t.owner == msg.sender, "Ban khong phai chu so huu chiec ve nay");
-        require(!t.isCheckedIn, "Ve da check-in khong the sang nhuong");
-        require(resalePrice <= (t.originalPrice * MAX_MARKUP_BPS) / 10000, "Chong phe ve: Gia ban lai khong duoc vuot qua gia goc + 10%!");
+        require(t.owner == seller, "Nguoi ban khong so huu ve");
+        require(!t.isCheckedIn,  "Ve da check-in, khong the ban lai");
+        require(resalePrice > 0, "Gia ban lai phai lon hon 0");
+        require(
+            resalePrice <= (t.originalPrice * MAX_MARKUP_BPS) / 10000,
+            "Chong phe ve: Gia ban lai khong duoc vuot gia goc + 10%!"
+        );
 
         resaleListings[ticketId] = ResaleListing({
-            ticketId: ticketId,
-            seller: payable(msg.sender),
+            ticketId:    ticketId,
             resalePrice: resalePrice,
-            active: true
+            seller:      seller,
+            active:      true
         });
 
-        emit TicketListedForResale(ticketId, msg.sender, resalePrice);
+        emit TicketListedForResale(ticketId, seller, resalePrice);
     }
 
-    // Hoán đổi nguyên tử trong 1 giây (Atomic Swap)
-    function buyResaleTicketAtomic(uint256 ticketId) external payable {
+    /// @notice Hủy rao bán
+    function unlistResale(uint256 ticketId, address seller) external onlyAdmin {
+        require(resaleListings[ticketId].active, "Ve khong dang duoc rao ban");
+        require(resaleListings[ticketId].seller == seller, "Khong phai nguoi rao ban");
+        resaleListings[ticketId].active = false;
+        emit TicketUnlisted(ticketId, seller);
+    }
+
+    /// @notice Mua vé bán lại — Atomic: chuyển ownership + emit event
+    function buyResale(
+        uint256 ticketId,
+        address buyer
+    ) external onlyAdmin {
         ResaleListing storage listing = resaleListings[ticketId];
-        require(listing.active, "Ve khong con duoc rao ban");
-        require(msg.value == listing.resalePrice, "So tien thanh toan khong chinh xac");
-        require(msg.sender != listing.seller, "Khong the tu mua ve cua chinh minh");
+        require(listing.active,         "Ve khong con duoc rao ban");
+        require(buyer != listing.seller, "Khong the tu mua ve cua chinh minh");
 
         listing.active = false;
+        address seller = listing.seller;
+        uint256 price  = listing.resalePrice;
 
-        // Tính toán phân bổ tiền
-        uint256 platformFee = (msg.value * PLATFORM_FEE_BPS) / 10000;
-        uint256 sellerAmount = msg.value - platformFee;
+        ticketContract.transferOwnership(ticketId, buyer);
 
-        // 1. Chuyển tiền người bán (95%)
-        listing.seller.transfer(sellerAmount);
-        // 2. Chuyển phí sàn (5%)
-        platformTreasury.transfer(platformFee);
+        emit ResalePurchased(ticketId, buyer, seller, price);
+    }
 
-        // 3. Chuyển quyền sở hữu vé sang người mua mới
-        ticketContract.transferOwnership(ticketId, msg.sender);
-
-        emit AtomicSwapSuccess(ticketId, msg.sender, listing.seller, msg.value);
+    /// @notice Soát vé tại cổng (record on-chain + validate QR window)
+    function scanTicket(uint256 ticketId, uint256 totpTimestamp) external onlyAdmin {
+        ticketContract.checkIn(ticketId, totpTimestamp);
+        emit TicketScanned(ticketId, msg.sender, block.timestamp);
     }
 }

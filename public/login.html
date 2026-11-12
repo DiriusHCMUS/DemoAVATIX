@@ -1,18 +1,131 @@
 <!doctype html><html lang=vi><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>AVA-TIX · Đăng nhập</title><link rel=stylesheet href=style.css>
-<body class=auth><main class="card box"><h1 class=logo style="font-size:34px"><span>AVA</span>-TIX</h1><p class=note>Vé sự kiện chính hãng - mã QR đổi mỗi 60 giây - chống phe vé.</p>
+<body class=auth><main class="card box"><h1 class=logo style="font-size:34px"><span>AVA</span>-TIX</h1><p class=note>Vé sự kiện chính hãng - mã QR đổi mỗi 20 giây - chống phe vé.</p>
 <div class=tabs><button id=tl class=on>Đăng nhập</button><button id=tr>Đăng ký</button></div><p id=msg class=note hidden></p>
-<form id=fl><label>Tên đăng nhập</label><input id=lu autocomplete=username required><label>Mật khẩu</label><input id=lp type=password autocomplete=current-password required><p><button class=btn style="width:100%;margin-top:14px">Đăng nhập</button></p></form>
-<form id=fr hidden><label>Loại tài khoản</label><div class=pay><label class=r><input type=radio name=role value=customer checked>Khách hàng</label><label class=r><input type=radio name=role value=organizer>Nhà cung cấp (BTC)</label></div>
-<label>Tên đăng nhập (tối thiểu 8 ký tự)</label><input id=ru minlength=8 required><label>Mật khẩu (tối thiểu 8 ký tự, 1 chữ in hoa, 1 số)</label><input id=rp type=password required>
-<label>Email</label><input id=re type=email required><label>Số điện thoại</label><input id=rt inputmode=tel maxlength=10 required>
-<label>Liên kết tài khoản ngân hàng</label><div class=row style="flex-wrap:nowrap"><select id=rb style="width:42%"><option>Vietcombank<option>MB Bank<option>Techcombank<option>ACB<option>BIDV<option>VPBank<option>TPBank</select><input id=rn inputmode=numeric placeholder="Số tài khoản" required></div>
-<div id=cc hidden><label>Số CCCD (xác minh nhà cung cấp)</label><input id=rc inputmode=numeric maxlength=12 placeholder="12 chữ số"></div>
-<p><button class=btn style="width:100%;margin-top:14px">Tạo tài khoản</button></p></form></main>
+
+<form id=fl>
+  <label>Tên đăng nhập</label><input id=lu autocomplete=username required>
+  <label>Mật khẩu</label><input id=lp type=password autocomplete=current-password required>
+  <p><button class=btn style="width:100%;margin-top:14px">Đăng nhập</button></p>
+  <div class=link-row>
+    <button type=button class=link-btn id=goVerify>Xác thực Email</button>
+    <button type=button class=link-btn id=goForgot>Quên mật khẩu?</button>
+  </div>
+</form>
+
+<form id=fr hidden>
+  <label>Loại tài khoản</label><div class=pay><label class=r><input type=radio name=role value=customer checked>Khách hàng</label><label class=r><input type=radio name=role value=organizer>Nhà cung cấp (BTC)</label></div>
+  <label>Tên đăng nhập (tối thiểu 8 ký tự)</label><input id=ru minlength=8 required>
+  <label>Mật khẩu (tối thiểu 8 ký tự, 1 chữ in hoa, 1 số)</label><input id=rp type=password required>
+  <label>Email</label><input id=re type=email required>
+  <label>Số điện thoại</label><input id=rt inputmode=tel maxlength=10 required>
+  <label>Liên kết tài khoản ngân hàng</label><div class=row style="flex-wrap:nowrap"><select id=rb style="width:42%"><option>Vietcombank<option>MB Bank<option>Techcombank<option>ACB<option>BIDV<option>VPBank<option>TPBank</select><input id=rn inputmode=numeric placeholder="Số tài khoản" required></div>
+  <div id=cc hidden><label>Số CCCD (xác minh nhà cung cấp)</label><input id=rc inputmode=numeric maxlength=12 placeholder="12 chữ số"></div>
+  <p><button class=btn style="width:100%;margin-top:14px">Tạo tài khoản</button></p>
+</form>
+
+<form id=fv hidden>
+  <h3>Xác thực Email</h3>
+  <div id=fvHint></div>
+  <label>Tên đăng nhập</label><input id=vu required>
+  <label>Mã OTP (6 chữ số)</label><input id=vc inputmode=numeric maxlength=6 placeholder="Ví dụ: 123456">
+  <div class=row style="margin-top:14px">
+    <button type=button class="btn sm ghost" id=fvResend>Gửi lại OTP</button>
+    <button class=btn style="flex:1">Xác thực ngay</button>
+  </div>
+  <div class=link-row><button type=button class=link-btn onclick="sw('login')">← Quay lại đăng nhập</button></div>
+</form>
+
+<form id=ff hidden>
+  <h3>Khôi phục mật khẩu</h3>
+  <p class=note>Nhập tên đăng nhập (hoặc email duy nhất) để nhận mã OTP đặt lại mật khẩu.</p>
+  <div id=ffHint></div>
+  <label>Tên đăng nhập hoặc Email</label>
+  <div class=row style="flex-wrap:nowrap">
+    <input id=fi required placeholder="username hoặc email">
+    <button type=button class="btn sm ghost" id=ffSend style="white-space:nowrap">Gửi OTP</button>
+  </div>
+  <div id=ffStep2 hidden>
+    <label>Mã OTP (6 chữ số)</label><input id=fc inputmode=numeric maxlength=6 placeholder="123456">
+    <label>Mật khẩu mới (≥ 8 ký tự, 1 chữ hoa, 1 số)</label><input id=fp1 type=password autocomplete=new-password>
+    <label>Nhập lại mật khẩu mới</label><input id=fp2 type=password autocomplete=new-password>
+    <p><button class=btn style="width:100%;margin-top:14px">Đặt lại mật khẩu</button></p>
+  </div>
+  <div class=link-row><button type=button class=link-btn onclick="sw('login')">← Quay lại đăng nhập</button></div>
+</form>
+</main>
 <script src=app.js></script><script>
-const msg=(t,c)=>{$('#msg').hidden=!t;$('#msg').textContent=t;$('#msg').className='note '+c},sw=r=>{$('#fl').hidden=r;$('#fr').hidden=!r;$('#tl').className=r?'':'on';$('#tr').className=r?'on':'';msg('')};
-$('#tl').onclick=()=>sw(0);$('#tr').onclick=()=>sw(1);
+const msg=(t,c)=>{$('#msg').hidden=!t;$('#msg').textContent=t;$('#msg').className='note '+(c||'')};
+const showOtp=(box,r)=>{
+  $(box).innerHTML=r.devOtp?`<div class=dev-otp><b>[Dev Mode]</b> Chưa cấu hình SMTP. Mã OTP của <b>${esc(r.username||'bạn')}</b> (${esc(r.maskedEmail||'')}) là: <b class=mono>${esc(r.devOtp)}</b></div>`
+  :r.maskedEmail?`<p class="note good">Đã gửi mã OTP 6 số tới <b>${esc(r.maskedEmail)}</b> (hiệu lực 5 phút).</p>`:'';
+};
+function sw(mode){
+  $('#fl').hidden=mode!=='login';
+  $('#fr').hidden=mode!=='register';
+  $('#fv').hidden=mode!=='verify';
+  $('#ff').hidden=mode!=='forgot';
+  $('#tl').className=mode==='login'?'on':'';
+  $('#tr').className=mode==='register'?'on':'';
+  msg('');
+}
+$('#tl').onclick=()=>sw('login');
+$('#tr').onclick=()=>sw('register');
+$('#goVerify').onclick=()=>{sw('verify');$('#vu').value=$('#lu').value.trim();$('#fvHint').innerHTML=''};
+$('#goForgot').onclick=()=>{sw('forgot');$('#fi').value=$('#lu').value.trim();$('#ffStep2').hidden=true;$('#ffHint').innerHTML=''};
 document.querySelectorAll('[name=role]').forEach(r=>r.onchange=()=>$('#cc').hidden=document.querySelector('[name=role]:checked').value!=='organizer');
-$('#fl').onsubmit=async e=>{e.preventDefault();try{const d=await api('login',{username:$('#lu').value.trim(),password:$('#lp').value});location='/'+d.role+'.html'}catch(x){msg(x.message,'err')}};
-$('#fr').onsubmit=async e=>{e.preventDefault();try{await api('register',{role:document.querySelector('[name=role]:checked').value,username:$('#ru').value.trim(),password:$('#rp').value,email:$('#re').value.trim(),phone:$('#rt').value.trim(),bank:$('#rb').value+' - '+$('#rn').value.trim(),cccd:$('#rc').value.trim()});
- e.target.reset();sw(0);$('#lp').value='';msg('Đăng ký thành công! Vui lòng đăng nhập bằng tài khoản vừa tạo.','good')}catch(x){msg(x.message,'err')}};
+
+$('#fl').onsubmit=async e=>{
+  e.preventDefault();
+  try{const d=await api('login',{username:$('#lu').value.trim(),password:$('#lp').value});location='/'+d.role+'.html'}
+  catch(x){msg(x.message,'err')}
+};
+
+$('#fr').onsubmit=async e=>{
+  e.preventDefault();
+  try{
+    const d=await api('register',{role:document.querySelector('[name=role]:checked').value,username:$('#ru').value.trim(),password:$('#rp').value,email:$('#re').value.trim(),phone:$('#rt').value.trim(),bank:$('#rb').value+' - '+$('#rn').value.trim(),cccd:$('#rc').value.trim()});
+    e.target.reset();
+    sw('verify');
+    $('#vu').value=d.username;
+    $('#vc').value='';
+    if(d.otpError){msg('Tạo tài khoản thành công nhưng gửi email thất bại: '+d.otpError,'err')}
+    else{showOtp('#fvHint',d);msg('Đăng ký thành công! Nhập mã OTP 6 số để xác thực email.','good')}
+  }catch(x){msg(x.message,'err')}
+};
+
+$('#fvResend').onclick=async()=>{
+  try{const d=await api('verify-email/request',{username:$('#vu').value.trim()});showOtp('#fvHint',d);msg('Đã gửi lại mã OTP!','good')}
+  catch(x){msg(x.message,'err')}
+};
+
+$('#fv').onsubmit=async e=>{
+  e.preventDefault();
+  try{
+    const uname=$('#vu').value.trim();
+    await api('verify-email/confirm',{username:uname,code:$('#vc').value.trim()});
+    sw('login');
+    $('#lu').value=uname;$('#lp').value='';
+    msg('Xác thực Email thành công! Bạn có thể đăng nhập ngay.','good');
+  }catch(x){msg(x.message,'err')}
+};
+
+$('#ffSend').onclick=async()=>{
+  try{
+    const d=await api('forgot-password/request',{identifier:$('#fi').value.trim()});
+    $('#ffStep2').hidden=false;
+    showOtp('#ffHint',d);
+    msg('Đã phát hành mã OTP khôi phục mật khẩu!','good');
+  }catch(x){msg(x.message,'err')}
+};
+
+$('#ff').onsubmit=async e=>{
+  e.preventDefault();
+  if($('#fp1').value!==$('#fp2').value)return msg('Mật khẩu xác nhận không khớp','err');
+  try{
+    await api('forgot-password/confirm',{identifier:$('#fi').value.trim(),code:$('#fc').value.trim(),newPassword:$('#fp1').value});
+    sw('login');
+    $('#lp').value='';
+    msg('Đặt lại mật khẩu thành công! Vui lòng đăng nhập bằng mật khẩu mới.','good');
+  }catch(x){msg(x.message,'err')}
+};
 </script>

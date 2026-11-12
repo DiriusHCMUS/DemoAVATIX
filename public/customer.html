@@ -1,30 +1,69 @@
 <!doctype html><html lang=vi><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>AVA-TIX · Khách hàng</title><link rel=stylesheet href=style.css>
-<body><header class=top id=top></header><main class=wrap><div class=tabs id=tabs></div><input id=q placeholder="Tìm kiếm show theo tên hoặc địa điểm..." oninput=draw()><div class=grid id=list></div></main>
+<body><header class=top id=top></header><main class=wrap><div class=tabs id=tabs></div><input id=q placeholder="Tìm kiếm show theo tên hoặc địa điểm..." oninput=draw()><div id=wrapList></div></main>
 <script src=app.js></script><script>
-let tab='open',ev=[],tk=[],mk=[];const T={open:'Vé đang mở bán',mine:'Vé của tôi',market:'Chợ vé'};
+let tab='open',ev=[],tk=[],mk=[],hs=[];
+const T={open:'Vé đang mở bán',mine:'Vé của tôi',market:'Chợ vé',history:'Lịch sử on-chain'};
 (async()=>{window.me=await init('customer');if(me)load()})();
-async function load(){[ev,tk,mk]=await Promise.all([api('events'),api('tickets'),api('market')]);draw()}
+async function load(){[ev,tk,mk,hs]=await Promise.all([api('events'),api('tickets'),api('market'),api('history')]);draw()}
 const hit=o=>(o.name+' '+o.venue).toLowerCase().includes($('#q').value.trim().toLowerCase());
 const info=o=>`<p>Ngày: ${dmy(o.date)}<br>Địa điểm: ${esc(o.venue)}</p>`;
-function draw(){$('#tabs').innerHTML=Object.entries(T).map(([k,v])=>`<button class="${k===tab?'on':''}" onclick="tab='${k}';draw()">${v}</button>`).join('');
+function draw(){
+ $('#tabs').innerHTML=Object.entries(T).map(([k,v])=>`<button class="${k===tab?'on':''}" onclick="tab='${k}';draw()">${v}</button>`).join('');
+ $('#q').hidden=tab==='history';
+ if(tab==='history'){$('#wrapList').innerHTML=renderHistory(hs);return}
  const L=tab==='open'?ev.filter(hit).map(e=>`<article class=card><h3>${esc(e.name)}</h3>${info(e)}<p class=note>Nhà tổ chức: ${esc(e.org)}</p><div class=row><b>${vnd(e.price)}</b>${e.remain>0?`<span class=badge>Còn ${e.remain}/${e.total}</span>`:'<span class="badge out">SOLD OUT</span>'}</div>
   <button class=btn ${e.remain>0?'':'disabled'} onclick="confirmBuy('buy',{event:${e.id}},${e.id},'open')">${e.remain>0?'Mua vé':'Hết vé'}</button></article>`)
- :tab==='mine'?tk.filter(hit).map(t=>`<article class=card><h3>${esc(t.name)} <small>#${t.id}</small></h3>${info(t)}<div class=row><span>Giá gốc: <b>${vnd(t.orig)}</b></span>${t.used?'<span class="badge ok">Đã check-in</span>':t.listed?`<span class=badge>Đang bán ${vnd(t.listed)}</span>`:'<span class=badge>Đang sở hữu</span>'}</div>
-  ${t.used?'':`<div class=row><button class="btn sm" onclick=qr(${t.id})>Mở mã QR</button>${t.listed?`<button class="btn sm red" onclick=unlist(${t.id})>Hủy rao bán</button>`:`<button class="btn sm ghost" onclick=resale(${t.id})>Bán lại</button>`}</div>`}</article>`)
- :mk.filter(hit).map(t=>`<article class=card><h3>${esc(t.name)} <small>#${t.id}</small></h3>${info(t)}<p class=note>Người bán: ${esc(t.seller)} · Giá gốc ${vnd(t.orig)}</p><div class=row><b>${vnd(t.listed)}</b></div>
+ :tab==='mine'?tk.filter(hit).map(t=>`<article class=card><h3>${esc(t.name)} <small>#${t.id}</small></h3>${info(t)}<div class=row><span>Giá gốc: <b>${vnd(t.orig)}</b></span>${t.token_id?`<span class="badge nft">NFT #${t.token_id}</span>`:''}${t.used?'<span class="badge ok">Đã check-in</span>':t.listed?`<span class=badge>Đang bán ${vnd(t.listed)}</span>`:'<span class=badge>Đang sở hữu</span>'}</div>
+  <div class=row>${t.used?'':`<button class="btn sm" onclick=qr(${t.id})>Mở mã QR</button>${t.listed?`<button class="btn sm red" onclick=unlist(${t.id})>Hủy rao bán</button>`:`<button class="btn sm ghost" onclick=resale(${t.id})>Bán lại</button>`}`}${t.token_id?`<button class="btn sm ghost" onclick=viewChain(${t.id})>On-chain</button>`:''}</div></article>`)
+ :mk.filter(hit).map(t=>`<article class=card><h3>${esc(t.name)} <small>#${t.id}</small></h3>${info(t)}<p class=note>Người bán: ${esc(t.seller)} · Giá gốc ${vnd(t.orig)}</p><div class=row><b>${vnd(t.listed)}</b>${t.token_id?`<span class="badge nft">NFT #${t.token_id}</span>`:''}</div>
   ${t.owner===me.id?'<span class=badge>Vé của bạn</span>':`<button class=btn onclick="confirmBuy('buy-resale',{ticket:${t.id}},${t.id},'market')">Mua lại vé</button>`}</article>`);
- $('#list').innerHTML=L.length?L.join(''):'<div class="card empty">Không có kết quả phù hợp.</div>'}
-function confirmBuy(path,body,id,src){const o=src==='open'?ev.find(x=>x.id===id):mk.find(x=>x.id===id),price=src==='open'?o.price:o.listed;
+ $('#wrapList').innerHTML=`<div class=grid>${L.length?L.join(''):'<div class="card empty">Không có kết quả phù hợp.</div>'}</div>`;
+}
+function confirmBuy(path,body,id,src){
+ const o=src==='open'?ev.find(x=>x.id===id):mk.find(x=>x.id===id),price=src==='open'?o.price:o.listed;
  openModal(`<h2>Xác nhận mua vé</h2><table class=info><tr><th>Sự kiện</th><td>${esc(o.name)}</td></tr><tr><th>Ngày / nơi</th><td>${dmy(o.date)} - ${esc(o.venue)}</td></tr><tr><th>Giá vé</th><td><b>${vnd(price)}</b></td></tr>
- <tr><th>Người mua</th><td>${esc(me.username)}</td></tr><tr><th>Email</th><td>${esc(me.email)}</td></tr><tr><th>SĐT</th><td>${esc(me.phone)}</td></tr><tr><th>Ngân hàng</th><td>${esc(me.bank)}</td></tr><tr><th>Số dư ví</th><td>${vnd(me.balance)}</td></tr></table>
+ <tr><th>Người mua</th><td>${esc(me.username)}</td></tr><tr><th>Ví on-chain</th><td class=mono>${esc(me.wallet||'—')}</td></tr><tr><th>Email</th><td>${esc(me.email)}</td></tr><tr><th>SĐT</th><td>${esc(me.phone)}</td></tr><tr><th>Ngân hàng</th><td>${esc(me.bank)}</td></tr><tr><th>Số dư ví</th><td>${vnd(me.balance)}</td></tr></table>
  <p class=note>Vui lòng kiểm tra kỹ thông tin trước khi xác nhận.</p>
  <div class=chk><input type=checkbox id=ag onchange="$('#ok').disabled=!this.checked"><span>Tôi đã đọc, hiểu và cam kết với <span class=tip><a href=terms.html target=_blank>điều khoản và chính sách</a><a class=pop href=terms.html target=_blank>Mở Điều khoản &amp; Chính sách ↗</a></span> của AVA-TIX.</span></div>
  <div class=row><button class="btn ghost" onclick=closeModal()>Hủy</button><button id=ok class=btn disabled>Xác nhận mua</button></div>`);
- $('#ok').onclick=async()=>{try{await api(path,body);closeModal();toast('Mua vé thành công!');me=await api('me');setBal(me);tab='mine';await load()}catch(e){toast(e.message,1)}}}
-function resale(id){const t=tk.find(x=>x.id===id),max=Math.floor(t.orig*1.1);openModal(`<h2>Bán lại vé #${id}</h2><p>Giá gốc: <b>${vnd(t.orig)}</b><br>Quy định chống phe vé: giá bán tối đa <b>${vnd(max)}</b> (giá gốc + 10%). Phí sàn 5% trên giá bán.</p>
+ $('#ok').onclick=async()=>{
+  $('#ok').disabled=true;$('#ok').textContent='Đang xử lý...';
+  try{const res=await api(path,body);closeModal();toast(res.txHash?`Mua vé thành công! (On-chain: ${shortHash(res.txHash)})`:'Mua vé thành công!');me=await api('me');setBal(me);tab='mine';await load()}
+  catch(e){$('#ok').disabled=false;$('#ok').textContent='Xác nhận mua';toast(e.message,1)}
+ };
+}
+function resale(id){
+ const t=tk.find(x=>x.id===id),max=Math.floor(t.orig*1.1);
+ openModal(`<h2>Bán lại vé #${id}</h2><p>Giá gốc: <b>${vnd(t.orig)}</b><br>Quy định chống phe vé: giá bán tối đa <b>${vnd(max)}</b> (giá gốc + 10%). Phí sàn 5% trên giá bán.</p>
  <label>Giá bán lại (VNĐ)</label><input id=rp inputmode=numeric value="${dots(t.orig)}" oninput=money(this)><div class=row><button class="btn ghost" onclick=closeModal()>Hủy</button><button id=ok class=btn>Đăng bán</button></div>`);
- $('#ok').onclick=async()=>{try{await api('list',{ticket:id,price:num($('#rp').value)});closeModal();toast('Đã đăng bán lên chợ');await load()}catch(e){toast(e.message,1)}}}
-async function unlist(id){await api('unlist',{ticket:id});toast('Đã hủy rao bán');load()}
-function qr(id){openModal('<h2>Mã QR vào cổng</h2><div class=qrbox id=qb>Đang tạo mã...</div><p class="note" id=cd style="text-align:center"></p><p class=note>Mã tự đổi mỗi 60 giây. Ảnh chụp màn hình sẽ hết hạn.</p><div class=row><button class="btn ghost" onclick=closeModal()>Đóng</button></div>');
- const g=async()=>{try{const r=await api('qr/'+id);$('#qb').innerHTML=r.svg;let s=r.left;clearInterval(window.tm);window.tm=setInterval(()=>{if(!$('#cd'))return clearInterval(window.tm);$('#cd').textContent='Đổi mã sau '+s+' giây';if(--s<0)g()},1000)}catch(e){toast(e.message,1)}};g()}
+ $('#ok').onclick=async()=>{
+  $('#ok').disabled=true;
+  try{const res=await api('list',{ticket:id,price:num($('#rp').value)});closeModal();toast(res.txHash?`Đã đăng bán on-chain (${shortHash(res.txHash)})`:'Đã đăng bán lên chợ');await load()}
+  catch(e){$('#ok').disabled=false;toast(e.message,1)}
+ };
+}
+async function unlist(id){try{await api('unlist',{ticket:id});toast('Đã hủy rao bán');load()}catch(e){toast(e.message,1)}}
+function qr(id){
+ openModal('<h2>Mã QR vào cổng</h2><div class=qrbox id=qb>Đang tạo mã...</div><p class="note" id=cd style="text-align:center"></p><div class=row><input id=qt readonly class=mono style="flex:1"><button class="btn sm ghost" id=cp>Copy mã</button></div><p class=note>Mã tự đổi mỗi 20 giây. Ảnh chụp màn hình sẽ hết hạn.</p><div class=row><button class="btn ghost" onclick=closeModal()>Đóng</button></div>');
+ $('#cp').onclick=()=>{navigator.clipboard?.writeText($('#qt').value);toast('Đã copy mã QR!')};
+ const g=async()=>{try{const r=await api('qr/'+id);$('#qb').innerHTML=r.svg;$('#qt').value=r.token;let s=r.left;clearInterval(window.tm);window.tm=setInterval(()=>{if(!$('#cd'))return clearInterval(window.tm);$('#cd').textContent='Đổi mã sau '+s+' giây';if(--s<0)g()},1000)}catch(e){toast(e.message,1)}};g();
+}
+async function viewChain(id){
+ try{
+  const d=await api('tickets/'+id+'/chain');const oc=d.onChain;
+  openModal(`<h2>Minh chứng Vé NFT #${d.ticket.token_id}</h2>
+   <table class=info>
+    <tr><th>Sự kiện</th><td>${esc(d.ticket.name)}</td></tr>
+    <tr><th>Mạng</th><td>${esc(d.chainStatus.networkName)}</td></tr>
+    <tr><th>Contract NFT</th><td class=mono>${esc(d.chainStatus.avaTicketAddress||'—')}</td></tr>
+    <tr><th>Giao dịch gần nhất</th><td>${txHtml(d.ticket.tx_hash,d.explorerUrl)}</td></tr>
+    ${oc?`<tr><th>Chủ sở hữu (On-chain)</th><td class=mono>${esc(oc.owner)}</td></tr>
+    <tr><th>Thông tin vé</th><td>${esc(oc.seatInfo)}</td></tr>
+    <tr><th>Giá gốc (On-chain)</th><td>${vnd(oc.originalPrice)}</td></tr>
+    <tr><th>Check-in (On-chain)</th><td>${oc.isCheckedIn?'<span class="badge ok">Đã check-in</span>':'<span class=badge>Chưa check-in</span>'}</td></tr>`
+    :`<tr><th>Trạng thái</th><td class=note>Đang chạy trên dữ liệu cục bộ (chưa đọc được on-chain).</td></tr>`}
+   </table>
+   <div class=row><button class="btn ghost" onclick=closeModal()>Đóng</button></div>`);
+ }catch(e){toast(e.message,1)}
+}
 </script>

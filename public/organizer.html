@@ -1,19 +1,40 @@
 <!doctype html><html lang=vi><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>AVA-TIX · Nhà cung cấp</title><link rel=stylesheet href=style.css>
 <body><header class=top id=top></header><main class=wrap><div class=tabs id=tabs></div><div id=body></div></main>
 <script src=app.js></script><script>
-let tab='stats',st=[];const T={stats:'Thống kê show',create:'Tạo sự kiện',scan:'Soát vé'};
+let tab='stats',st=[],hs=[];
+const T={stats:'Thống kê show',create:'Tạo sự kiện',scan:'Soát vé',history:'Lịch sử on-chain'};
 (async()=>{window.me=await init('organizer');if(me)load()})();
-async function load(){st=await api('stats');draw()}
-function draw(){$('#tabs').innerHTML=Object.entries(T).map(([k,v])=>`<button class="${k===tab?'on':''}" onclick="tab='${k}';draw()">${v}</button>`).join('');
- const b=$('#body');if(tab==='stats'){const S=k=>st.reduce((a,e)=>a+e[k],0);
+async function load(){[st,hs]=await Promise.all([api('stats'),api('history')]);draw()}
+function draw(){
+ $('#tabs').innerHTML=Object.entries(T).map(([k,v])=>`<button class="${k===tab?'on':''}" onclick="tab='${k}';draw()">${v}</button>`).join('');
+ const b=$('#body');
+ if(tab==='stats'){
+  const S=k=>st.reduce((a,e)=>a+e[k],0);
   b.innerHTML=`<div class=tiles><div class=card>Tổng show<b>${st.length}</b></div><div class=card>Vé đã bán<b>${S('sold')}/${S('total')}</b></div><div class=card>Doanh thu (sau phí sàn 5%)<b>${vnd(S('revenue'))}</b></div></div>
-  <input id=q style="margin-top:20px" placeholder="Tìm kiếm show theo tên hoặc địa điểm..." oninput=list()><div class=grid id=list></div>`;list()}
- else if(tab==='create'){b.innerHTML=`<form class=card id=f style="max-width:560px;margin-top:20px"><h2>Tạo sự kiện mới</h2><label>Tên sự kiện</label><input id=n required><label>Ngày tổ chức</label><input id=d type=date min="${new Date().toISOString().slice(0,10)}" required>
-  <label>Địa điểm</label><input id=v required><label>Giá vé (VNĐ)</label><input id=p inputmode=numeric oninput=money(this) required><label>Số lượng vé</label><input id=t type=number min=1 step=1 required><p class=note>Khi số vé về 0, hệ thống tự hiển thị SOLD OUT và khóa mua vé. Phí sàn 5% trên mỗi vé bán ra.</p><button class=btn>Tạo sự kiện</button></form>`;$('#f').onsubmit=create}
- else{b.innerHTML=`<div class=card style="max-width:560px;margin-top:20px"><h2>Soát vé tại cổng</h2><label>Nội dung mã QR (quét bằng đầu đọc/camera rồi dán vào đây)</label><input id=tk placeholder="AVATIX|..."><p><button class=btn id=sc>Kiểm tra vé</button></p><p id=res class=note></p></div>`;$('#sc').onclick=scan}}
-function list(){const k=$('#q').value.trim().toLowerCase(),L=st.filter(e=>(e.name+' '+e.venue).toLowerCase().includes(k));
+  <input id=q style="margin-top:20px" placeholder="Tìm kiếm show theo tên hoặc địa điểm..." oninput=list()><div class=grid id=list></div>`;list();
+ }else if(tab==='create'){
+  b.innerHTML=`<form class=card id=f style="max-width:560px;margin-top:20px"><h2>Tạo sự kiện mới</h2><label>Tên sự kiện</label><input id=n required><label>Ngày tổ chức</label><input id=d type=date min="${new Date().toISOString().slice(0,10)}" required>
+  <label>Địa điểm</label><input id=v required><label>Giá vé (VNĐ)</label><input id=p inputmode=numeric oninput=money(this) required><label>Số lượng vé</label><input id=t type=number min=1 step=1 required><p class=note>Khi số vé về 0, hệ thống tự hiển thị SOLD OUT và khóa mua vé. Phí sàn 5% trên mỗi vé bán ra.</p><button class=btn>Tạo sự kiện</button></form>`;$('#f').onsubmit=create;
+ }else if(tab==='scan'){
+  b.innerHTML=`<div class=card style="max-width:560px;margin-top:20px"><h2>Soát vé tại cổng</h2><label>Nội dung mã QR (quét bằng đầu đọc/camera rồi dán vào đây)</label><input id=tk placeholder="AVATIX|..."><p><button class=btn id=sc>Kiểm tra vé</button></p><div id=res class=note></div></div>`;$('#sc').onclick=scan;
+ }else{
+  b.innerHTML=renderHistory(hs);
+ }
+}
+function list(){
+ const k=$('#q').value.trim().toLowerCase(),L=st.filter(e=>(e.name+' '+e.venue).toLowerCase().includes(k));
  $('#list').innerHTML=L.length?L.map(e=>`<article class=card><h3>${esc(e.name)}</h3><p>${dmy(e.date)} - ${esc(e.venue)}</p><div class=row><b>${vnd(e.price)}</b>${e.remain?'':'<span class="badge out">SOLD OUT</span>'}</div><div class=bar><i style="width:${e.sold/e.total*100}%"></i></div>
- <div class=kv><span>Đã bán<b>${e.sold}/${e.total}</b></span><span>Còn lại<b>${e.remain}</b></span><span>Doanh thu<b>${vnd(e.revenue)}</b></span><span>Đã check-in<b>${e.checked}</b></span><span>Đang bán lại<b>${e.listed}</b></span></div></article>`).join(''):'<div class="card empty">Chưa có show nào.</div>'}
+ <div class=kv><span>Đã bán<b>${e.sold}/${e.total}</b></span><span>Còn lại<b>${e.remain}</b></span><span>Doanh thu<b>${vnd(e.revenue)}</b></span><span>Đã check-in<b>${e.checked}</b></span><span>Đang bán lại<b>${e.listed}</b></span></div></article>`).join(''):'<div class="card empty">Chưa có show nào.</div>';
+}
 async function create(e){e.preventDefault();try{await api('events',{name:$('#n').value.trim(),date:$('#d').value,venue:$('#v').value.trim(),price:num($('#p').value),total:Number($('#t').value)});toast('Đã tạo sự kiện');tab='stats';load()}catch(x){toast(x.message,1)}}
-async function scan(){try{const r=await api('scan',{token:$('#tk').value});$('#res').className='note good';$('#res').textContent=r.msg}catch(x){$('#res').className='note err';$('#res').textContent=x.message}}
+async function scan(){
+ $('#sc').disabled=true;$('#sc').textContent='Đang kiểm tra...';
+ try{
+  const r=await api('scan',{token:$('#tk').value});
+  $('#res').className='note good';
+  $('#res').innerHTML=esc(r.msg)+(r.txHash?`<br>On-chain: ${txHtml(r.txHash,r.explorerUrl)}`:'');
+  load();
+ }catch(x){$('#res').className='note err';$('#res').textContent=x.message}
+ finally{if($('#sc')){$('#sc').disabled=false;$('#sc').textContent='Kiểm tra vé'}}
+}
 </script>

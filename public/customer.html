@@ -1,11 +1,44 @@
-<!doctype html><html lang=vi><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>AVA-TIX · Khách hàng</title><link rel=stylesheet href=style.css>
-<body><header class=top id=top></header><main class=wrap><div class=tabs id=tabs></div><div class=search-box><input id=q placeholder="Tìm kiếm show âm nhạc, hội thảo blockchain, địa điểm..." oninput=draw()></div><div id=wrapList></div></main>
+<!doctype html><html lang=vi><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>AVA-TIX · Mua vé sự kiện chính hãng Web3</title><link rel=stylesheet href=style.css>
+<body><header class=top id=top></header><main class=wrap><div id=heroWrap></div><div class=tabs id=tabs></div><div class=search-box><input id=q placeholder="Tìm kiếm sự kiện, nghệ sĩ, địa điểm tổ chức..." oninput=draw()></div><div id=wrapList></div></main>
+<footer class=site-footer>
+  <div class=footer-wrap>
+    <div class=footer-col>
+      <div class=logo style="margin-bottom:12px"><span>AVA</span>-TIX <small>WEB3</small></div>
+      <p>Nền tảng phân phối &amp; quản trị vé sự kiện thế hệ mới, ứng dụng Smart Contract trên Avalanche C-Chain. Bảo vệ 100% người hâm mộ khỏi nạn vé giả và phe vé trục lợi thông qua mã QR động đổi mỗi 20 giây và trần giá bán lại tối đa 110%.</p>
+    </div>
+    <div class=footer-col>
+      <h4>Danh mục sự kiện</h4>
+      <ul class=footer-links>
+        <li><a href="#" onclick="tab='open';draw();return false">🎵 Đại nhạc hội &amp; Live Concert</a></li>
+        <li><a href="#" onclick="tab='open';draw();return false">⛓️ Hội thảo Web3 &amp; Công nghệ</a></li>
+        <li><a href="#" onclick="tab='open';draw();return false">🎸 Indie Music &amp; Sân khấu nghệ thuật</a></li>
+        <li><a href="#" onclick="tab='market';draw();return false">🔄 Sàn giao dịch vé thứ cấp P2P</a></li>
+      </ul>
+    </div>
+    <div class=footer-col>
+      <h4>Hỗ trợ &amp; An toàn</h4>
+      <ul class=footer-links>
+        <li><a href=terms.html target=_blank>Điều khoản &amp; Quy chế bán vé</a></li>
+        <li><a href="#" onclick="openSecurityModal();return false">Xác thực Email &amp; Bảo mật OTP</a></li>
+        <li><a href="#" onclick="showChainInfo();return false">Kiểm tra Smart Contract Explorer</a></li>
+        <li><a href="mailto:support@avatix.vn">Liên hệ: support@avatix.vn</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class=footer-bottom>© 2026 AVA-TIX Platform. All rights reserved. Secured by Avalanche Blockchain Fuji.</div>
+</footer>
 <script src=app.js></script><script>
 let tab='open',ev=[],tk=[],mk=[],hs=[];
-const T={open:'🎟️ Vé đang mở bán',mine:'🎫 Vé của tôi',market:'🔄 Chợ vé thứ cấp',history:'⛓️ Lịch sử On-chain'};
+const T={open:'🎟️ Sự kiện đang mở bán',mine:'🎫 Vé của tôi (E-Ticket)',market:'🔄 Chợ vé thứ cấp (P2P)',history:'⛓️ Lịch sử On-chain'};
 (async()=>{window.me=await init('customer');if(me)load()})();
 async function load(){[ev,tk,mk,hs]=await Promise.all([api('events'),api('tickets'),api('market'),api('history')]);draw()}
 const hit=o=>(o.name+' '+o.venue).toLowerCase().includes($('#q').value.trim().toLowerCase());
+
+function parseDateBadge(dStr){
+ if(!dStr)return{m:'THG --',d:'--'};
+ const p=dStr.split('-');
+ return{m:'THG '+(p[1]||'--'),d:p[2]||'--'};
+}
 
 function bannerTheme(name){
  const n=String(name||'').toLowerCase();
@@ -14,82 +47,130 @@ function bannerTheme(name){
  return{cls:'music',icon:'🎵',tag:'Live Concert'};
 }
 
+function renderHero(list){
+ if(tab!=='open'||!list.length)return'';
+ const topEv=list[0];
+ return `<div class="hero-banner">
+  <div class="hero-content">
+   <div class="hero-tag">🔥 ĐẠI NHẠC HỘI TIÊU ĐIỂM · CHÍNH HÃNG</div>
+   <h2 class="hero-title">${esc(topEv.name)}</h2>
+   <p class="hero-desc">Bảo chứng bởi Avalanche NFT. Mã QR động xoay mỗi 20 giây chống vé chụp màn hình. Mua vé an toàn 100% với xác thực OTP Email.</p>
+   <div class="hero-meta">
+    <div class="hero-meta-item">📅 <b>${dmy(topEv.date)}</b></div>
+    <div class="hero-meta-item">📍 <b>${esc(topEv.venue)}</b></div>
+    <div class="hero-meta-item">🎟️ <b>Giá từ ${vnd(topEv.price)}</b></div>
+   </div>
+   <div class="hero-actions">
+    <button class="btn" ${topEv.remain>0?'':'disabled'} onclick="confirmBuy('buy',{event:${topEv.id}},${topEv.id},'open')">
+     ${topEv.remain>0?'🛒 Mua vé ngay':'Hết vé'}
+    </button>
+    <button class="btn ghost" onclick="viewDetail(${topEv.id},'open')">👁️ Xem chi tiết show</button>
+   </div>
+  </div>
+  <div class="hero-art">🎸</div>
+ </div>`;
+}
+
 function draw(){
+ $('#heroWrap').innerHTML=renderHero(ev);
  $('#tabs').innerHTML=Object.entries(T).map(([k,v])=>`<button class="${k===tab?'on':''}" onclick="tab='${k}';draw()">${v}</button>`).join('');
  $('#q').parentElement.hidden=tab==='history';
  if(tab==='history'){$('#wrapList').innerHTML=renderHistory(hs);return}
 
  const L=tab==='open'?ev.filter(hit).map(e=>{
-  const th=bannerTheme(e.name);
+  const th=bannerTheme(e.name),db=parseDateBadge(e.date);
   return `<article class=card>
-   <div class="card-banner ${th.cls}">
-    <span class=banner-icon>${th.icon}</span>
-    <span class=banner-badge>${th.tag}</span>
+   <div class="event-poster ${th.cls}">
+    <div class=date-badge>
+     <div class=month>${db.m}</div>
+     <div class=day>${db.d}</div>
+    </div>
+    <span class="poster-tag ${e.remain>0?'':'out'}">${e.remain>0?'⚡ ĐANG MỞ BÁN':'SOLD OUT'}</span>
+    <div class=event-poster-icon>${th.icon}</div>
    </div>
-   <div class=card-inner>
+   <div class=card-content>
     <h3>${esc(e.name)}</h3>
-    <div class=card-meta>
-     <div class=card-meta-item>📅 <span>${dmy(e.date)}</span></div>
-     <div class=card-meta-item>📍 <span>${esc(e.venue)}</span></div>
-     <div class=card-meta-item>🏢 <span>${esc(e.org)}</span></div>
+    <div class=event-details>
+     <div class=event-details-row>📅 <span>${dmy(e.date)}</span></div>
+     <div class=event-details-row>📍 <span>${esc(e.venue)}</span></div>
+     <div class=event-details-row>🏢 <span>${esc(e.org)}</span></div>
     </div>
-    <div class=card-price-row>
-     <div class=card-price>${vnd(e.price)}</div>
-     ${e.remain>0?`<span class="badge ok">⚡ Còn ${e.remain}/${e.total}</span>`:'<span class="badge out">🚫 SOLD OUT</span>'}
-    </div>
-    <div class=card-footer>
-     <button class="btn sm ghost" onclick="viewDetail(${e.id},'open')">👁️ Chi tiết</button>
-     <button class="btn sm" ${e.remain>0?'':'disabled'} onclick="confirmBuy('buy',{event:${e.id}},${e.id},'open')">${e.remain>0?'🛒 Mua vé':'Hết vé'}</button>
+    <div class=card-action-bar>
+     <div class=price-block>
+      <span class=price-label>Giá vé từ</span>
+      <span class=price-amount>${vnd(e.price)}</span>
+     </div>
+     <div class=card-btn-group>
+      <button class="btn sm ghost" onclick="viewDetail(${e.id},'open')">👁️ Chi tiết</button>
+      <button class="btn sm" ${e.remain>0?'':'disabled'} onclick="confirmBuy('buy',{event:${e.id}},${e.id},'open')">
+       ${e.remain>0?'🛒 Mua vé':'Hết vé'}
+      </button>
+     </div>
     </div>
    </div>
   </article>`;
  })
  :tab==='mine'?tk.filter(hit).map(t=>{
-  const th=bannerTheme(t.name);
-  return `<article class=card>
-   <div class="card-banner ${th.cls}">
-    <span class=banner-icon>${th.icon}</span>
-    <span class=banner-badge>${t.token_id?`💎 NFT #${t.token_id}`:'🎟️ Vé #'+t.id}</span>
+  const th=bannerTheme(t.name),db=parseDateBadge(t.date);
+  return `<article class="card e-ticket">
+   <div class="event-poster ${th.cls}" style="height:120px">
+    <div class=date-badge>
+     <div class=month>${db.m}</div>
+     <div class=day>${db.d}</div>
+    </div>
+    <span class="poster-tag">${t.token_id?`💎 NFT #${t.token_id}`:'🎟️ Vé #'+t.id}</span>
+    <div class=event-poster-icon style="font-size:45px">${th.icon}</div>
    </div>
-   <div class=card-inner>
+   <div class=card-content>
     <h3>${esc(t.name)} <small>#${t.id}</small></h3>
-    <div class=card-meta>
-     <div class=card-meta-item>📅 <span>${dmy(t.date)}</span></div>
-     <div class=card-meta-item>📍 <span>${esc(t.venue)}</span></div>
+    <div class=event-details>
+     <div class=event-details-row>📅 <span>${dmy(t.date)}</span></div>
+     <div class=event-details-row>📍 <span>${esc(t.venue)}</span></div>
     </div>
-    <div class=card-price-row>
-     <div>Giá gốc: <b>${vnd(t.orig)}</b></div>
-     ${t.used?'<span class="badge ok">✅ Đã check-in</span>':t.listed?`<span class=badge>🔄 Rao bán ${vnd(t.listed)}</span>`:'<span class="badge ok">🎫 Đang sở hữu</span>'}
+    <div class=ticket-notch-divider><div class=ticket-dashed-line></div></div>
+    <div class=card-action-bar style="border-top:none;padding-top:0">
+     <div class=price-block>
+      <span class=price-label>Giá gốc</span>
+      <span class=price-amount style="font-size:16px">${vnd(t.orig)}</span>
+     </div>
+     <div>${t.used?'<span class="badge ok">✅ Đã check-in</span>':t.listed?`<span class=badge>🔄 Rao bán ${vnd(t.listed)}</span>`:'<span class="badge ok">🎫 Đang sở hữu</span>'}</div>
     </div>
-    <div class=card-footer>
+    <div class=card-btn-group style="justify-content:flex-end;margin-top:10px">
      <button class="btn sm ghost" onclick="viewDetail(${t.id},'mine')">👁️ Chi tiết</button>
-     ${t.used?'':`<button class="btn sm" onclick=qr(${t.id})>📱 Mã QR</button>${t.listed?`<button class="btn sm red" onclick=unlist(${t.id})>❌ Hủy bán</button>`:`<button class="btn sm ghost" onclick=resale(${t.id})>🔄 Bán lại</button>`}`}
+     ${t.used?'':`<button class="btn green sm" onclick=qr(${t.id})>📱 Mã QR vào cổng</button>
+       ${t.listed?`<button class="btn sm red" onclick=unlist(${t.id})>❌ Hủy bán</button>`:`<button class="btn sm ghost" onclick=resale(${t.id})>🔄 Bán lại</button>`}`}
      ${t.token_id?`<button class="btn sm ghost" onclick=viewChain(${t.id})>🔗 On-chain</button>`:''}
     </div>
    </div>
   </article>`;
  })
  :mk.filter(hit).map(t=>{
-  const th=bannerTheme(t.name);
+  const th=bannerTheme(t.name),db=parseDateBadge(t.date);
   return `<article class=card>
-   <div class="card-banner ${th.cls}">
-    <span class=banner-icon>${th.icon}</span>
-    <span class=banner-badge>${t.token_id?`💎 NFT #${t.token_id}`:'🔄 Chợ vé'}</span>
+   <div class="event-poster ${th.cls}">
+    <div class=date-badge>
+     <div class=month>${db.m}</div>
+     <div class=day>${db.d}</div>
+    </div>
+    <span class="poster-tag">🔄 CHỢ VÉ THỨ CẤP</span>
+    <div class=event-poster-icon>${th.icon}</div>
    </div>
-   <div class=card-inner>
+   <div class=card-content>
     <h3>${esc(t.name)} <small>#${t.id}</small></h3>
-    <div class=card-meta>
-     <div class=card-meta-item>📅 <span>${dmy(t.date)}</span></div>
-     <div class=card-meta-item>📍 <span>${esc(t.venue)}</span></div>
-     <div class=card-meta-item>👤 Người bán: <span>${esc(t.seller)}</span> (Gốc: ${vnd(t.orig)})</div>
+    <div class=event-details>
+     <div class=event-details-row>📅 <span>${dmy(t.date)}</span></div>
+     <div class=event-details-row>📍 <span>${esc(t.venue)}</span></div>
+     <div class=event-details-row>👤 Người bán: <span>${esc(t.seller)}</span> (Gốc: ${vnd(t.orig)})</div>
     </div>
-    <div class=card-price-row>
-     <div class=card-price style="color:var(--primary)">${vnd(t.listed)}</div>
-     <span class="badge nft">Vé bán lại</span>
-    </div>
-    <div class=card-footer>
-     <button class="btn sm ghost" onclick="viewDetail(${t.id},'market')">👁️ Chi tiết</button>
-     ${t.owner===me.id?'<span class=badge>Vé của bạn</span>':`<button class="btn sm" onclick="confirmBuy('buy-resale',{ticket:${t.id}},${t.id},'market')">🛒 Mua lại vé</button>`}
+    <div class=card-action-bar>
+     <div class=price-block>
+      <span class=price-label>Giá bán lại</span>
+      <span class="price-amount resale">${vnd(t.listed)}</span>
+     </div>
+     <div class=card-btn-group>
+      <button class="btn sm ghost" onclick="viewDetail(${t.id},'market')">👁️ Chi tiết</button>
+      ${t.owner===me.id?'<span class=badge>Vé của bạn</span>':`<button class="btn sm" onclick="confirmBuy('buy-resale',{ticket:${t.id}},${t.id},'market')">🛒 Mua lại vé</button>`}
+     </div>
     </div>
    </div>
   </article>`;
@@ -109,7 +190,7 @@ function viewDetail(id,src){
    ${src==='market'?`<tr><th>Người bán lại</th><td>${esc(o.seller)}</td></tr><tr><th>Giá gốc</th><td>${vnd(o.orig)}</td></tr>`:''}
    <tr><th>Ngày tổ chức</th><td>${dmy(o.date)}</td></tr>
    <tr><th>Địa điểm</th><td>${esc(o.venue)}</td></tr>
-   <tr><th>${src==='mine'?'Giá gốc':'Giá vé'}</th><td><b>${vnd(price)}</b></td></tr>
+   <tr><th>${src==='mine'?'Giá gốc':'Giá vé'}</th><td><b style="color:var(--tb-green);font-size:16px">${vnd(price)}</b></td></tr>
    ${src==='open'?`<tr><th>Vé còn lại</th><td>${o.remain>0?`${o.remain}/${o.total} vé`:'<span class="badge out">SOLD OUT</span>'}</td></tr>`:''}
   </table>
   <div class=detail-box>
@@ -120,7 +201,7 @@ function viewDetail(id,src){
    <button class="btn ghost" onclick=closeModal()>Đóng</button>
    ${src==='open'&&o.remain>0?`<button class=btn onclick="confirmBuy('buy',{event:${o.id}},${o.id},'open')">🛒 Mua vé ngay</button>`:''}
    ${src==='market'&&o.owner!==me.id?`<button class=btn onclick="confirmBuy('buy-resale',{ticket:${o.id}},${o.id},'market')">🛒 Mua lại vé</button>`:''}
-   ${src==='mine'&&!o.used?`<button class=btn onclick="qr(${o.id})">📱 Mở mã QR</button>`:''}
+   ${src==='mine'&&!o.used?`<button class="btn green" onclick="qr(${o.id})">📱 Mở mã QR vào cổng</button>`:''}
   </div>`);
 }
 
@@ -131,7 +212,7 @@ function confirmBuy(path,body,id,src){
   <table class=info>
    <tr><th>Sự kiện</th><td><b>${esc(o.name)}</b></td></tr>
    <tr><th>Ngày / nơi</th><td>${dmy(o.date)} - ${esc(o.venue)}</td></tr>
-   <tr><th>Giá vé</th><td><b>${vnd(price)}</b></td></tr>
+   <tr><th>Giá vé</th><td><b style="color:var(--tb-green);font-size:16px">${vnd(price)}</b></td></tr>
    <tr><th>Người mua</th><td>${esc(me.username)}</td></tr>
    <tr><th>Ví on-chain</th><td class=mono>${esc(me.wallet||'—')}</td></tr>
    <tr><th>Email nhận OTP</th><td><b>${esc(me.email)}</b></td></tr>
@@ -160,7 +241,7 @@ function renderOtpStep(path,body,o,price,otpRes){
  openModal(`<h2>Xác thực OTP mua vé</h2>
   <table class=info>
    <tr><th>Sự kiện</th><td><b>${esc(o.name)}</b></td></tr>
-   <tr><th>Số tiền</th><td><b>${vnd(price)}</b></td></tr>
+   <tr><th>Số tiền</th><td><b style="color:var(--tb-green);font-size:16px">${vnd(price)}</b></td></tr>
    <tr><th>Email nhận mã</th><td><b>${esc(otpRes.maskedEmail||me.email)}</b></td></tr>
   </table>
   ${otpRes.devOtp?`<div class=dev-otp><b>[Dev Mode]</b> Mã OTP mua vé: <b class="mono" style="font-size:19px;letter-spacing:2px">${esc(otpRes.devOtp)}</b> (hiệu lực 5 phút)</div>`:`<p class="note good">✓ Đã gửi mã OTP 6 số tới email của bạn. Vui lòng kiểm tra hộp thư.</p>`}
@@ -241,7 +322,7 @@ async function viewChain(id){
   openModal(`<h2>Minh chứng Vé NFT #${d.ticket.token_id}</h2>
    <table class=info>
     <tr><th>Sự kiện</th><td><b>${esc(d.ticket.name)}</b></td></tr>
-    <tr><th>Mạng</th><td><b>${esc(d.chainStatus.networkName)}</b></td></tr>
+    <tr><th>Mạng</th><td>${esc(d.chainStatus.networkName)}</td></tr>
     <tr><th>Contract NFT</th><td class=mono>${esc(d.chainStatus.avaTicketAddress||'—')}</td></tr>
     <tr><th>Giao dịch gần nhất</th><td>${txHtml(d.ticket.tx_hash,d.explorerUrl)}</td></tr>
     ${oc?`<tr><th>Chủ sở hữu (On-chain)</th><td class=mono>${esc(oc.owner)}</td></tr>

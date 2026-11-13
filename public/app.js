@@ -44,21 +44,25 @@ function renderTop(me,role){
   const c=me.chain||{};
   const pill=c.enabled?`⛓️ ${esc(c.networkName)}`:'⛓️ Off-chain';
   const secBtn=me.emailVerified
-    ?`<button class="chain-pill on" onclick=openSecurityModal() title="Email đã xác thực · Đổi mật khẩu">🛡️ Bảo mật &amp; Email</button>`
+    ?`<button class="chain-pill on" onclick=openSecurityModal() title="Email đã xác thực · Đổi mật khẩu">🛡️ Bảo mật</button>`
     :`<button class="chain-pill warn" onclick=openSecurityModal() title="Xác thực email & Đổi mật khẩu">⚠️ Xác thực Email</button>`;
+  const firstLetter = (me.username || 'U')[0].toUpperCase();
   $('#top').innerHTML=`
     <div class=top-left>
-      <div class=logo onclick="location.reload()"><span>AVA</span>-TIX</div>
-      <button class="chain-pill ${c.enabled?'on':'off'}" onclick=showChainInfo() title="Xem thông tin Smart Contract">${pill}</button>
+      <div class=logo onclick="location.reload()">
+        <span>AVA</span>-TIX <small>WEB3</small>
+      </div>
+      <button class="chain-pill ${c.enabled?'on':'off'}" onclick=showChainInfo() title="Xem thông tin Smart Contract Avalanche">${pill}</button>
     </div>
     <div class=top-right>
       ${secBtn}
-      <div class=top-user title="${role==='customer'?'Khách hàng':'Nhà cung cấp'}">
-        <span>👤 <b>${esc(me.username)}</b> <small style="color:#94a3b8">(${role==='customer'?'Khách':'BTC'})</small></span>
+      <div class=top-user title="Tài khoản ${role==='customer'?'Khách hàng':'Nhà tổ chức'}">
+        <span class=avatar>${firstLetter}</span>
+        <span><b>${esc(me.username)}</b> <small style="color:#64748b">(${role==='customer'?'Khách':'BTC'})</small></span>
       </div>
       <div class=bal><span>💰</span> Ví: <span id=bal></span></div>
-      <button class="btn sm" onclick=topup()>+ Nạp tiền</button>
-      <button class="btn sm ghost" onclick=logout() title="Đăng xuất">Đăng xuất</button>
+      <button class="btn green sm" onclick=topup()>+ Nạp tiền</button>
+      <button class="btn ghost sm" onclick=logout() title="Đăng xuất">Đăng xuất</button>
     </div>`;
   setBal(me);
 }

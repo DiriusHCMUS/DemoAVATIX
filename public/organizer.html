@@ -1,10 +1,42 @@
-<!doctype html><html lang=vi><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>AVA-TIX · Nhà cung cấp</title><link rel=stylesheet href=style.css>
+<!doctype html><html lang=vi><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>AVA-TIX · Nhà tổ chức sự kiện (Organizer Portal)</title><link rel=stylesheet href=style.css>
 <body><header class=top id=top></header><main class=wrap><div class=tabs id=tabs></div><div id=body></div></main>
+<footer class=site-footer>
+  <div class=footer-wrap>
+    <div class=footer-col>
+      <div class=logo style="margin-bottom:12px"><span>AVA</span>-TIX <small>ORGANIZER</small></div>
+      <p>Cổng thông tin quản trị vé dành cho Ban tổ chức sự kiện. Tự động hóa phát hành vé NFT on-chain trên Avalanche, kiểm soát trần giá thứ cấp 110% chống phe vé và hỗ trợ soát vé tốc độ cao tại cổng.</p>
+    </div>
+    <div class=footer-col>
+      <h4>Công cụ quản trị</h4>
+      <ul class=footer-links>
+        <li><a href="#" onclick="tab='stats';draw();return false">📊 Thống kê doanh thu &amp; Phân phối</a></li>
+        <li><a href="#" onclick="tab='create';draw();return false">➕ Đăng ký &amp; Phát hành show mới</a></li>
+        <li><a href="#" onclick="tab='scan';draw();return false">📷 Đầu đọc soát vé vào cổng</a></li>
+        <li><a href="#" onclick="tab='history';draw();return false">⛓️ Lịch sử Smart Contract</a></li>
+      </ul>
+    </div>
+    <div class=footer-col>
+      <h4>Hỗ trợ Ban tổ chức</h4>
+      <ul class=footer-links>
+        <li><a href=terms.html target=_blank>Quy định xác minh CCCD &amp; Trách nhiệm BTC</a></li>
+        <li><a href="#" onclick="openSecurityModal();return false">Bảo mật tài khoản &amp; Email OTP</a></li>
+        <li><a href="mailto:organizer@avatix.vn">Hỗ trợ kỹ thuật: organizer@avatix.vn</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class=footer-bottom>© 2026 AVA-TIX Platform. Organizer Management Portal. Secured by Avalanche Fuji.</div>
+</footer>
 <script src=app.js></script><script>
 let tab='stats',st=[],hs=[];
-const T={stats:'📊 Thống kê show',create:'➕ Tạo sự kiện',scan:'📷 Soát vé tại cổng',history:'⛓️ Lịch sử On-chain'};
+const T={stats:'📊 Thống kê show diễn',create:'➕ Tạo sự kiện mới',scan:'📷 Soát vé tại cổng',history:'⛓️ Lịch sử On-chain'};
 (async()=>{window.me=await init('organizer');if(me)load()})();
 async function load(){[st,hs]=await Promise.all([api('stats'),api('history')]);draw()}
+
+function parseDateBadge(dStr){
+ if(!dStr)return{m:'THG --',d:'--'};
+ const p=dStr.split('-');
+ return{m:'THG '+(p[1]||'--'),d:p[2]||'--'};
+}
 
 function bannerTheme(name){
  const n=String(name||'').toLowerCase();
@@ -23,7 +55,7 @@ function draw(){
    <div class=card><span class=tile-label>🎟️ Vé đã phân phối</span><b>${S('sold')}/${S('total')}</b></div>
    <div class=card><span class=tile-label>💰 Doanh thu thực nhận (95%)</span><b>${vnd(S('revenue'))}</b></div>
   </div>
-  <div class=search-box><input id=q placeholder="Tìm kiếm show theo tên hoặc địa điểm..." oninput=list()></div>
+  <div class=search-box><input id=q placeholder="Tìm kiếm show theo tên sự kiện hoặc địa điểm..." oninput=list()></div>
   <div class=grid id=list></div>`;
   list();
  }else if(tab==='create'){
@@ -60,21 +92,27 @@ function draw(){
 function list(){
  const k=$('#q').value.trim().toLowerCase(),L=st.filter(e=>(e.name+' '+e.venue).toLowerCase().includes(k));
  $('#list').innerHTML=L.length?L.map(e=>{
-  const th=bannerTheme(e.name);
+  const th=bannerTheme(e.name),db=parseDateBadge(e.date);
   return `<article class=card>
-   <div class="card-banner ${th.cls}">
-    <span class=banner-icon>${th.icon}</span>
-    <span class=banner-badge>${th.tag}</span>
-   </div>
-   <div class=card-inner>
-    <h3>${esc(e.name)}</h3>
-    <div class=card-meta>
-     <div class=card-meta-item>📅 <span>${dmy(e.date)}</span></div>
-     <div class=card-meta-item>📍 <span>${esc(e.venue)}</span></div>
+   <div class="event-poster ${th.cls}">
+    <div class=date-badge>
+     <div class=month>${db.m}</div>
+     <div class=day>${db.d}</div>
     </div>
-    <div class=card-price-row>
-     <div class=card-price>${vnd(e.price)}</div>
-     ${e.remain>0?`<span class="badge ok">Còn ${e.remain}/${e.total} vé</span>`:'<span class="badge out">🚫 SOLD OUT</span>'}
+    <span class="poster-tag ${e.remain>0?'':'out'}">${e.remain>0?`Còn ${e.remain}/${e.total} vé`:'SOLD OUT'}</span>
+    <div class=event-poster-icon>${th.icon}</div>
+   </div>
+   <div class=card-content>
+    <h3>${esc(e.name)}</h3>
+    <div class=event-details>
+     <div class=event-details-row>📅 <span>${dmy(e.date)}</span></div>
+     <div class=event-details-row>📍 <span>${esc(e.venue)}</span></div>
+    </div>
+    <div class=card-action-bar style="border-top:none;padding-top:4px">
+     <div class=price-block>
+      <span class=price-label>Giá vé phát hành</span>
+      <span class=price-amount>${vnd(e.price)}</span>
+     </div>
     </div>
     <div class=bar><i style="width:${(e.sold/e.total*100)||0}%"></i></div>
     <div class=kv>
@@ -83,8 +121,8 @@ function list(){
      <span>Doanh thu<b>${vnd(e.revenue)}</b></span>
      <span>Check-in<b>${e.checked}</b></span>
     </div>
-    <div class=card-footer style="margin-top:12px">
-     <button class="btn sm ghost" onclick="viewOrgDetail(${e.id})">👁️ Xem chi tiết show</button>
+    <div class=card-action-bar style="margin-top:12px">
+     <button class="btn sm ghost" style="width:100%" onclick="viewOrgDetail(${e.id})">👁️ Xem chi tiết show diễn</button>
     </div>
    </div>
   </article>`;
@@ -98,9 +136,9 @@ function viewOrgDetail(id){
    <tr><th>Tên sự kiện</th><td><b>${esc(e.name)}</b></td></tr>
    <tr><th>Ngày tổ chức</th><td>${dmy(e.date)}</td></tr>
    <tr><th>Địa điểm</th><td>${esc(e.venue)}</td></tr>
-   <tr><th>Giá vé</th><td><b>${vnd(e.price)}</b></td></tr>
+   <tr><th>Giá vé</th><td><b style="color:var(--tb-green);font-size:16px">${vnd(e.price)}</b></td></tr>
    <tr><th>Số lượng vé</th><td>${e.total} vé (còn ${e.remain})</td></tr>
-   <tr><th>Doanh thu (95%)</th><td><b style="color:#059669">${vnd(e.revenue)}</b></td></tr>
+   <tr><th>Doanh thu thực nhận (95%)</th><td><b style="color:var(--tb-green);font-size:16px">${vnd(e.revenue)}</b></td></tr>
    <tr><th>Đã check-in</th><td><b>${e.checked}</b> vé</td></tr>
    <tr><th>Đang rao bán lại</th><td><b>${e.listed}</b> vé</td></tr>
   </table>

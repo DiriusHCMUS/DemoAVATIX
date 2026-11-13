@@ -221,7 +221,7 @@ async function _migrate(db) {
     console.log('[DB]   Tài khoản demo: demo_organizer / Demo@2025');
   } else {
     // Backfill description cho các sự kiện cũ chưa có mô tả
-    const emptyDesc = await db.all('SELECT id, name FROM events WHERE description IS NULL OR description=""');
+    const emptyDesc = await db.all("SELECT id, name FROM events WHERE description IS NULL OR TRIM(description) = ''");
     for (const e of emptyDesc) {
       let d = 'Sự kiện âm nhạc nghệ thuật đặc sắc được phân phối vé minh bạch qua hệ thống AVA-TIX. Thời gian mở cổng: 18h30. Vé check-in bằng mã QR động chống sao chép và chống phe vé.';
       if (e.name.includes('AVA-TUNES')) d = 'Đêm nhạc Acoustic & EDM quy tụ các nghệ sĩ trẻ tài năng. Thời gian mở cửa: 18h00, bắt đầu biểu diễn: 19h30. Vé đã bao gồm 01 phần nước uống miễn phí tại quầy và quà lưu niệm từ AVA-TIX. Quy định: Vui lòng xuất trình mã QR động lúc check-in tại cổng.';

@@ -46,6 +46,11 @@ const PURPOSE_META = {
     title: "Đặt lại mật khẩu",
     desc: "Bạn vừa yêu cầu khôi phục mật khẩu tài khoản AVA-TIX. Không chia sẻ mã này cho bất kỳ ai.",
   },
+  buy_ticket: {
+    subject: "[AVA-TIX] Mã OTP xác nhận mua vé",
+    title: "Xác nhận thanh toán mua vé",
+    desc: "Bạn đang thực hiện giao dịch mua vé trên AVA-TIX. Nhập mã OTP dưới đây để xác nhận thanh toán và nhận vé NFT.",
+  },
 };
 
 /**

@@ -218,10 +218,11 @@ const evSql = 'SELECT e.*,u.username org FROM events e JOIN users u ON u.id=e.or
 route('get', 'events', true, () => db.all(evSql + ' ORDER BY e.date'));
 route('post', 'events', 'organizer', async r => {
   const b = r.body, name = String(b.name || '').trim(), venue = String(b.venue || '').trim();
+  const desc = String(b.description || '').trim();
   if (!name || !venue) throw E('Nhập đủ tên sự kiện và địa điểm');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(b.date || '') || b.date < new Date().toISOString().slice(0, 10)) throw E('Ngày tổ chức không hợp lệ');
   const price = int(b.price, 0, 100000000, 'Giá vé không hợp lệ'), total = int(b.total, 1, 100000, 'Số lượng vé phải là số nguyên dương');
-  await db.run('INSERT INTO events(org,name,date,venue,price,total,remain) VALUES(?,?,?,?,?,?,?)', [r.u.id, name, b.date, venue, price, total, total]);
+  await db.run('INSERT INTO events(org,name,date,venue,price,total,remain,description) VALUES(?,?,?,?,?,?,?,?)', [r.u.id, name, b.date, venue, price, total, total, desc]);
   return { ok: 1 };
 });
 
@@ -254,8 +255,17 @@ const pay = async (buyer, seller, price, note) => {
 const isActiveContractTicket = t => t && t.token_id && chain.isEnabled() &&
   (!t.contract_addr || t.contract_addr === chain.getStatus().avaTicketAddress);
 
-// ─── Buy (Primary) ────────────────────────────────────────────────────────────
+// ─── Buy (Primary) & Buy OTP ──────────────────────────────────────────────────
+route('post', 'buy/request-otp', 'customer', async r => {
+  const res = await issueOtp(r.u, 'buy_ticket');
+  return { ok: 1, ...res };
+});
+
 route('post', 'buy', 'customer', async r => {
+  const code = String(r.body.code || '').trim();
+  if (!code) throw E('Vui lòng nhập mã OTP để xác nhận mua vé');
+  await verifyOtp(r.u.id, 'buy_ticket', code);
+
   const eventId = +r.body.event;
   const e = await db.get('SELECT * FROM events WHERE id=?', [eventId]);
   if (!e) throw E('Không tìm thấy sự kiện');
@@ -275,7 +285,7 @@ route('post', 'buy', 'customer', async r => {
 
 // ─── Tickets & Market ─────────────────────────────────────────────────────────
 route('get', 'tickets', 'customer', r => db.all(
-  'SELECT t.*,e.name,e.date,e.venue FROM tickets t JOIN events e ON e.id=t.event WHERE t.owner=? ORDER BY t.id DESC', [r.u.id]
+  'SELECT t.*,e.name,e.date,e.venue,e.description,u.username org FROM tickets t JOIN events e ON e.id=t.event JOIN users u ON u.id=e.org WHERE t.owner=? ORDER BY t.id DESC', [r.u.id]
 ));
 
 route('get', 'tickets/:id/chain', true, async r => {
@@ -310,11 +320,15 @@ route('post', 'unlist', 'customer', async r => {
 });
 
 route('get', 'market', 'customer', () => db.all(
-  'SELECT t.id,t.owner,t.listed,t.orig,t.token_id,t.tx_hash,e.name,e.date,e.venue,u.username seller FROM tickets t JOIN events e ON e.id=t.event JOIN users u ON u.id=t.owner WHERE t.listed IS NOT NULL AND t.used=0'
+  'SELECT t.id,t.owner,t.listed,t.orig,t.token_id,t.tx_hash,e.name,e.date,e.venue,e.description,u.username seller FROM tickets t JOIN events e ON e.id=t.event JOIN users u ON u.id=t.owner WHERE t.listed IS NOT NULL AND t.used=0'
 ));
 
 // ─── Buy Resale ───────────────────────────────────────────────────────────────
 route('post', 'buy-resale', 'customer', async r => {
+  const code = String(r.body.code || '').trim();
+  if (!code) throw E('Vui lòng nhập mã OTP để xác nhận mua lại vé');
+  await verifyOtp(r.u.id, 'buy_ticket', code);
+
   const ticketId = +r.body.ticket;
   const t = await db.get('SELECT t.*,e.name FROM tickets t JOIN events e ON e.id=t.event WHERE t.id=? AND t.listed IS NOT NULL AND t.used=0', [ticketId]);
   if (!t) throw E('Vé không còn được rao bán');

@@ -14,7 +14,9 @@ function draw(){
   <input id=q style="margin-top:20px" placeholder="Tìm kiếm show theo tên hoặc địa điểm..." oninput=list()><div class=grid id=list></div>`;list();
  }else if(tab==='create'){
   b.innerHTML=`<form class=card id=f style="max-width:560px;margin-top:20px"><h2>Tạo sự kiện mới</h2><label>Tên sự kiện</label><input id=n required><label>Ngày tổ chức</label><input id=d type=date min="${new Date().toISOString().slice(0,10)}" required>
-  <label>Địa điểm</label><input id=v required><label>Giá vé (VNĐ)</label><input id=p inputmode=numeric oninput=money(this) required><label>Số lượng vé</label><input id=t type=number min=1 step=1 required><p class=note>Khi số vé về 0, hệ thống tự hiển thị SOLD OUT và khóa mua vé. Phí sàn 5% trên mỗi vé bán ra.</p><button class=btn>Tạo sự kiện</button></form>`;$('#f').onsubmit=create;
+  <label>Địa điểm</label><input id=v required><label>Giá vé (VNĐ)</label><input id=p inputmode=numeric oninput=money(this) required><label>Số lượng vé</label><input id=t type=number min=1 step=1 required>
+  <label>Thông tin chi tiết sự kiện</label><textarea id=desc rows=3 placeholder="Mô tả sự kiện, nghệ sĩ biểu diễn, thời gian mở cổng, quy định check-in, quyền lợi vé..."></textarea>
+  <p class=note>Khi số vé về 0, hệ thống tự hiển thị SOLD OUT và khóa mua vé. Phí sàn 5% trên mỗi vé bán ra.</p><button class=btn>Tạo sự kiện</button></form>`;$('#f').onsubmit=create;
  }else if(tab==='scan'){
   b.innerHTML=`<div class=card style="max-width:560px;margin-top:20px"><h2>Soát vé tại cổng</h2><label>Nội dung mã QR (quét bằng đầu đọc/camera rồi dán vào đây)</label><input id=tk placeholder="AVATIX|..."><p><button class=btn id=sc>Kiểm tra vé</button></p><div id=res class=note></div></div>`;$('#sc').onclick=scan;
  }else{
@@ -24,9 +26,29 @@ function draw(){
 function list(){
  const k=$('#q').value.trim().toLowerCase(),L=st.filter(e=>(e.name+' '+e.venue).toLowerCase().includes(k));
  $('#list').innerHTML=L.length?L.map(e=>`<article class=card><h3>${esc(e.name)}</h3><p>${dmy(e.date)} - ${esc(e.venue)}</p><div class=row><b>${vnd(e.price)}</b>${e.remain?'':'<span class="badge out">SOLD OUT</span>'}</div><div class=bar><i style="width:${e.sold/e.total*100}%"></i></div>
- <div class=kv><span>Đã bán<b>${e.sold}/${e.total}</b></span><span>Còn lại<b>${e.remain}</b></span><span>Doanh thu<b>${vnd(e.revenue)}</b></span><span>Đã check-in<b>${e.checked}</b></span><span>Đang bán lại<b>${e.listed}</b></span></div></article>`).join(''):'<div class="card empty">Chưa có show nào.</div>';
+ <div class=kv><span>Đã bán<b>${e.sold}/${e.total}</b></span><span>Còn lại<b>${e.remain}</b></span><span>Doanh thu<b>${vnd(e.revenue)}</b></span><span>Đã check-in<b>${e.checked}</b></span><span>Đang bán lại<b>${e.listed}</b></span></div>
+ <div class=row style="margin-top:8px"><button class="btn sm ghost" onclick="viewOrgDetail(${e.id})">Chi tiết</button></div></article>`).join(''):'<div class="card empty">Chưa có show nào.</div>';
 }
-async function create(e){e.preventDefault();try{await api('events',{name:$('#n').value.trim(),date:$('#d').value,venue:$('#v').value.trim(),price:num($('#p').value),total:Number($('#t').value)});toast('Đã tạo sự kiện');tab='stats';load()}catch(x){toast(x.message,1)}}
+function viewOrgDetail(id){
+ const e=st.find(x=>x.id===id);if(!e)return;
+ openModal(`<h2>Chi tiết sự kiện</h2>
+  <table class=info>
+   <tr><th>Tên sự kiện</th><td><b>${esc(e.name)}</b></td></tr>
+   <tr><th>Ngày tổ chức</th><td>${dmy(e.date)}</td></tr>
+   <tr><th>Địa điểm</th><td>${esc(e.venue)}</td></tr>
+   <tr><th>Giá vé</th><td><b>${vnd(e.price)}</b></td></tr>
+   <tr><th>Số lượng vé</th><td>${e.total} vé (còn ${e.remain})</td></tr>
+   <tr><th>Doanh thu</th><td><b>${vnd(e.revenue)}</b></td></tr>
+   <tr><th>Đã check-in</th><td><b>${e.checked}</b> vé</td></tr>
+   <tr><th>Đang rao bán lại</th><td><b>${e.listed}</b> vé</td></tr>
+  </table>
+  <div class=detail-box>
+   <h4>Thông tin chi tiết</h4>
+   <p>${e.description?esc(e.description):'<i class=note>Chưa có thông tin mô tả chi tiết cho sự kiện này.</i>'}</p>
+  </div>
+  <div class=row><button class="btn ghost" onclick=closeModal()>Đóng</button></div>`);
+}
+async function create(e){e.preventDefault();try{await api('events',{name:$('#n').value.trim(),date:$('#d').value,venue:$('#v').value.trim(),price:num($('#p').value),total:Number($('#t').value),description:$('#desc').value.trim()});toast('Đã tạo sự kiện');tab='stats';load()}catch(x){toast(x.message,1)}}
 async function scan(){
  $('#sc').disabled=true;$('#sc').textContent='Đang kiểm tra...';
  try{

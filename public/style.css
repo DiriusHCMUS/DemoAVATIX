@@ -1,7 +1,7 @@
 *{box-sizing:border-box}
 :root{--ink:#1d2b3a;--bg:#fff6e5;--teal:#00a896;--yel:#ffc93c;--cor:#ff6b6b;--sky:#bfe9ff;--ln:2px solid var(--ink)}
 body{margin:0;background:var(--bg);color:var(--ink);font:18px/1.5 "Times New Roman",Times,serif}
-button,input,select{font:inherit;color:inherit}
+button,input,select,textarea{font:inherit;color:inherit}
 h1,h2,h3{margin:0 0 8px;line-height:1.2}
 .top{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:12px 24px;background:var(--yel);border-bottom:var(--ln)}
 .logo{font-size:28px;font-weight:700;margin-right:auto}.logo span{background:var(--ink);color:var(--yel);padding:0 8px;border-radius:6px}
@@ -15,7 +15,11 @@ h1,h2,h3{margin:0 0 8px;line-height:1.2}
 .btn:disabled{background:#d8d8d8;color:#666;box-shadow:none;cursor:not-allowed}
 .tabs{display:flex;gap:10px;flex-wrap:wrap;margin:18px 0 6px}
 .tabs button{background:#fff;border:var(--ln);border-radius:999px;padding:7px 20px;font-weight:700;cursor:pointer}.tabs button.on{background:var(--ink);color:var(--yel)}
-input,select{width:100%;padding:10px 12px;border:var(--ln);border-radius:10px;background:#fff}input:focus,select:focus{outline:3px solid var(--sky)}
+input,select,textarea{width:100%;padding:10px 12px;border:var(--ln);border-radius:10px;background:#fff;font-family:inherit}input:focus,select:focus,textarea:focus{outline:3px solid var(--sky)}
+textarea{resize:vertical;min-height:90px;line-height:1.4}
+.detail-box{background:var(--bg);border:1px dashed #9aa5b1;border-radius:10px;padding:12px;margin:12px 0}
+.detail-box h4{margin:0 0 6px;font-size:17px;color:var(--ink)}
+.detail-box p{margin:0;font-size:16px;white-space:pre-wrap;word-break:break-word;line-height:1.5}
 label{display:block;font-weight:700;margin:12px 0 4px}label.r{display:flex;gap:8px;align-items:center;font-weight:400;margin:0}label.r input{width:auto}
 .bal{background:#fff;border:var(--ln);border-radius:10px;padding:6px 14px;font-weight:700}
 .badge{display:inline-block;border:var(--ln);border-radius:999px;padding:0 12px;font-size:15px;font-weight:700;background:var(--sky)}.badge.out{background:var(--cor)}.badge.ok{background:var(--yel)}.badge.nft{background:#c9f2d9}

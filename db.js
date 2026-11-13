@@ -108,7 +108,8 @@ async function _migrate(db) {
     `CREATE TABLE IF NOT EXISTS events(
        id INTEGER PRIMARY KEY,
        org INTEGER, name TEXT, date TEXT, venue TEXT,
-       price INTEGER, total INTEGER, remain INTEGER
+       price INTEGER, total INTEGER, remain INTEGER,
+       description TEXT
      )`,
     `CREATE TABLE IF NOT EXISTS tickets(
        id INTEGER PRIMARY KEY,
@@ -137,6 +138,7 @@ async function _migrate(db) {
   const migrations = [
     { check: `PRAGMA table_info(users)`,   col: 'wallet',         sql: `ALTER TABLE users   ADD COLUMN wallet TEXT` },
     { check: `PRAGMA table_info(users)`,   col: 'email_verified', sql: `ALTER TABLE users   ADD COLUMN email_verified INTEGER DEFAULT 0` },
+    { check: `PRAGMA table_info(events)`,  col: 'description',    sql: `ALTER TABLE events  ADD COLUMN description TEXT` },
     { check: `PRAGMA table_info(tickets)`, col: 'token_id',       sql: `ALTER TABLE tickets ADD COLUMN token_id INTEGER` },
     { check: `PRAGMA table_info(tickets)`, col: 'tx_hash',        sql: `ALTER TABLE tickets ADD COLUMN tx_hash TEXT` },
     { check: `PRAGMA table_info(tickets)`, col: 'contract_addr',  sql: `ALTER TABLE tickets ADD COLUMN contract_addr TEXT` },
@@ -183,18 +185,49 @@ async function _migrate(db) {
     const addDays = n => { const d = new Date(today); d.setDate(d.getDate() + n); return d; };
 
     const events = [
-      { name: 'Đêm nhạc AVA-TUNES 2025', date: fmt(addDays(14)), venue: 'Nhà Hát Thành Phố, TP.HCM', price: 150000, total: 200 },
-      { name: 'Festival Blockchain Việt Nam', date: fmt(addDays(21)), venue: 'GEM Center, Quận 1, TP.HCM', price: 300000, total: 500 },
-      { name: 'Concert Indie Mùa Thu 2025',  date: fmt(addDays(30)), venue: 'Sân Khấu Trống Đồng, Hà Nội', price: 200000, total: 300 },
+      {
+        name: 'Đêm nhạc AVA-TUNES 2025',
+        date: fmt(addDays(14)),
+        venue: 'Nhà Hát Thành Phố, TP.HCM',
+        price: 150000,
+        total: 200,
+        description: 'Đêm nhạc Acoustic & EDM quy tụ các nghệ sĩ trẻ tài năng. Thời gian mở cửa: 18h00, bắt đầu biểu diễn: 19h30. Vé đã bao gồm 01 phần nước uống miễn phí tại quầy và quà lưu niệm từ AVA-TIX. Quy định: Vui lòng xuất trình mã QR động lúc check-in tại cổng, không mang thức ăn ngoài vào khán phòng.'
+      },
+      {
+        name: 'Festival Blockchain Việt Nam',
+        date: fmt(addDays(21)),
+        venue: 'GEM Center, Quận 1, TP.HCM',
+        price: 300000,
+        total: 500,
+        description: 'Diễn đàn công nghệ & ngày hội Web3 lớn nhất năm. Khám phá các xu hướng Layer 1/2, NFT Ticketing minh bạch, AI x Crypto cùng hơn 30 diễn giả đầu ngành. Thời gian: 08h30 - 17h30. Quyền lợi: Bao gồm teabreak, tài liệu hội thảo và quyền truy cập khu vực triển lãm công nghệ cao.'
+      },
+      {
+        name: 'Concert Indie Mùa Thu 2025',
+        date: fmt(addDays(30)),
+        venue: 'Sân Khấu Trống Đồng, Hà Nội',
+        price: 200000,
+        total: 300,
+        description: 'Không gian âm nhạc mộc mạc, gần gũi với những giai điệu Indie lãng mạn giữa lòng thủ đô. Thời gian: 19h00 - 22h00. Chỗ ngồi tự do theo khu vực vé. Vui lòng có mặt trước 30 phút để check-in vé on-chain vào cổng.'
+      },
     ];
 
     for (const ev of events) {
       await db.run(
-        'INSERT INTO events(org,name,date,venue,price,total,remain) VALUES(?,?,?,?,?,?,?)',
-        [orgId, ev.name, ev.date, ev.venue, ev.price, ev.total, ev.total]
+        'INSERT INTO events(org,name,date,venue,price,total,remain,description) VALUES(?,?,?,?,?,?,?,?)',
+        [orgId, ev.name, ev.date, ev.venue, ev.price, ev.total, ev.total, ev.description]
       );
     }
-    console.log('[DB] ✓ Seeded: 1 organizer demo + 3 sự kiện mẫu');
+    console.log('[DB] ✓ Seeded: 1 organizer demo + 3 sự kiện mẫu (kèm thông tin chi tiết)');
     console.log('[DB]   Tài khoản demo: demo_organizer / Demo@2025');
+  } else {
+    // Backfill description cho các sự kiện cũ chưa có mô tả
+    const emptyDesc = await db.all('SELECT id, name FROM events WHERE description IS NULL OR description=""');
+    for (const e of emptyDesc) {
+      let d = 'Sự kiện âm nhạc nghệ thuật đặc sắc được phân phối vé minh bạch qua hệ thống AVA-TIX. Thời gian mở cổng: 18h30. Vé check-in bằng mã QR động chống sao chép và chống phe vé.';
+      if (e.name.includes('AVA-TUNES')) d = 'Đêm nhạc Acoustic & EDM quy tụ các nghệ sĩ trẻ tài năng. Thời gian mở cửa: 18h00, bắt đầu biểu diễn: 19h30. Vé đã bao gồm 01 phần nước uống miễn phí tại quầy và quà lưu niệm từ AVA-TIX. Quy định: Vui lòng xuất trình mã QR động lúc check-in tại cổng.';
+      else if (e.name.includes('Blockchain')) d = 'Diễn đàn công nghệ & ngày hội Web3 lớn nhất năm. Khám phá các xu hướng Layer 1/2, NFT Ticketing minh bạch, AI x Crypto cùng hơn 30 diễn giả đầu ngành. Thời gian: 08h30 - 17h30. Quyền lợi: Bao gồm teabreak, tài liệu hội thảo và khu vực triển lãm.';
+      else if (e.name.includes('Indie')) d = 'Không gian âm nhạc mộc mạc, gần gũi với những giai điệu Indie lãng mạn giữa lòng thủ đô. Thời gian: 19h00 - 22h00. Chỗ ngồi tự do theo khu vực vé. Vui lòng có mặt trước 30 phút để check-in vé on-chain vào cổng.';
+      await db.run('UPDATE events SET description=? WHERE id=?', [d, e.id]);
+    }
   }
 }

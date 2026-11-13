@@ -267,6 +267,27 @@ h1, h2, h3, h4 { margin: 0 0 8px; color: var(--dark-heading); font-weight: 700; 
   filter: drop-shadow(0 15px 25px rgba(0, 0, 0, 0.4));
   animation: float 4s ease-in-out infinite;
 }
+.hero-poster-preview {
+  position: relative;
+  z-index: 2;
+  width: 175px;
+  height: 235px;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.5);
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  flex-shrink: 0;
+  transition: transform 0.3s ease;
+}
+.hero-poster-preview:hover {
+  transform: scale(1.04) rotate(1deg);
+}
+.hero-poster-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
 @keyframes float {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-8px); }
@@ -347,12 +368,62 @@ h1, h2, h3, h4 { margin: 0 0 8px; color: var(--dark-heading); font-weight: 700; 
 /* Event Poster Header with Date Badge */
 .event-poster {
   position: relative;
-  height: 155px;
+  height: 168px;
   background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
   overflow: hidden;
   display: flex;
   align-items: flex-end;
   padding: 14px;
+}
+.event-poster-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.15) 0%, rgba(15, 23, 42, 0.75) 100%);
+  pointer-events: none;
+  z-index: 1;
+}
+.event-poster-genre {
+  position: absolute;
+  bottom: 12px;
+  left: 14px;
+  z-index: 2;
+  font-size: 11px;
+  font-weight: 700;
+  color: #f8fafc;
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(6px);
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  letter-spacing: 0.3px;
+}
+.modal-banner {
+  width: calc(100% + 48px);
+  margin: -24px -24px 20px -24px;
+  height: 190px;
+  background-size: cover;
+  background-position: center;
+  border-top-left-radius: var(--radius-lg);
+  border-top-right-radius: var(--radius-lg);
+  position: relative;
+  box-shadow: inset 0 -40px 40px rgba(0, 0, 0, 0.65);
+}
+.modal-banner-tag {
+  position: absolute;
+  bottom: 12px;
+  left: 18px;
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(6px);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: var(--radius-full);
 }
 .event-poster.music {
   background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #db2777 100%);

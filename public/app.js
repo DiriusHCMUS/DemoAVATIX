@@ -159,3 +159,21 @@ function topup(){
   <div class=row><button class="btn ghost" onclick=closeModal()>Hủy</button><button class=btn id=go>Nạp tiền</button></div>`);
   $('#go').onclick=async()=>{try{await api('topup',{amount:num($('#amt').value),method:document.querySelector('[name=pm]:checked').value});closeModal();toast('Nạp tiền thành công');window.me=await api('me');setBal(window.me)}catch(e){toast(e.message,1)}};
 }
+function bannerTheme(name){
+  const n=String(name||'').toLowerCase();
+  if(n.includes('blockchain')||n.includes('web3')||n.includes('crypto'))
+    return {cls:'crypto',icon:'⛓️',tag:'Web3 & Tech',fallbackImg:'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=900&q=80'};
+  if(n.includes('indie')||n.includes('acoustic')||n.includes('thu'))
+    return {cls:'indie',icon:'🎸',tag:'Indie & Acoustic',fallbackImg:'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=900&q=80'};
+  return {cls:'music',icon:'🎵',tag:'Live Concert',fallbackImg:'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&w=900&q=80'};
+}
+function getEventImg(item){
+  if(item && item.image && item.image.trim()) return item.image.trim();
+  return bannerTheme(item ? item.name : '').fallbackImg;
+}
+function parseDateBadge(dStr){
+  if(!dStr)return{m:'THG --',d:'--'};
+  const parts=dStr.split('-');
+  if(parts.length===3) return {m:`THG ${parseInt(parts[1],10)}`,d:parts[2]};
+  return{m:'THG --',d:'--'};
+}

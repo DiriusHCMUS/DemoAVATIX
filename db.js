@@ -109,7 +109,7 @@ async function _migrate(db) {
        id INTEGER PRIMARY KEY,
        org INTEGER, name TEXT, date TEXT, venue TEXT,
        price INTEGER, total INTEGER, remain INTEGER,
-       description TEXT
+       description TEXT, image TEXT
      )`,
     `CREATE TABLE IF NOT EXISTS tickets(
        id INTEGER PRIMARY KEY,
@@ -139,6 +139,7 @@ async function _migrate(db) {
     { check: `PRAGMA table_info(users)`,   col: 'wallet',         sql: `ALTER TABLE users   ADD COLUMN wallet TEXT` },
     { check: `PRAGMA table_info(users)`,   col: 'email_verified', sql: `ALTER TABLE users   ADD COLUMN email_verified INTEGER DEFAULT 0` },
     { check: `PRAGMA table_info(events)`,  col: 'description',    sql: `ALTER TABLE events  ADD COLUMN description TEXT` },
+    { check: `PRAGMA table_info(events)`,  col: 'image',          sql: `ALTER TABLE events  ADD COLUMN image TEXT` },
     { check: `PRAGMA table_info(tickets)`, col: 'token_id',       sql: `ALTER TABLE tickets ADD COLUMN token_id INTEGER` },
     { check: `PRAGMA table_info(tickets)`, col: 'tx_hash',        sql: `ALTER TABLE tickets ADD COLUMN tx_hash TEXT` },
     { check: `PRAGMA table_info(tickets)`, col: 'contract_addr',  sql: `ALTER TABLE tickets ADD COLUMN contract_addr TEXT` },
@@ -191,7 +192,8 @@ async function _migrate(db) {
         venue: 'Nhà Hát Thành Phố, TP.HCM',
         price: 150000,
         total: 200,
-        description: 'Đêm nhạc Acoustic & EDM quy tụ các nghệ sĩ trẻ tài năng. Thời gian mở cửa: 18h00, bắt đầu biểu diễn: 19h30. Vé đã bao gồm 01 phần nước uống miễn phí tại quầy và quà lưu niệm từ AVA-TIX. Quy định: Vui lòng xuất trình mã QR động lúc check-in tại cổng, không mang thức ăn ngoài vào khán phòng.'
+        description: 'Đêm nhạc Acoustic & EDM quy tụ các nghệ sĩ trẻ tài năng. Thời gian mở cửa: 18h00, bắt đầu biểu diễn: 19h30. Vé đã bao gồm 01 phần nước uống miễn phí tại quầy và quà lưu niệm từ AVA-TIX. Quy định: Vui lòng xuất trình mã QR động lúc check-in tại cổng, không mang thức ăn ngoài vào khán phòng.',
+        image: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&w=900&q=80'
       },
       {
         name: 'Festival Blockchain Việt Nam',
@@ -199,7 +201,8 @@ async function _migrate(db) {
         venue: 'GEM Center, Quận 1, TP.HCM',
         price: 300000,
         total: 500,
-        description: 'Diễn đàn công nghệ & ngày hội Web3 lớn nhất năm. Khám phá các xu hướng Layer 1/2, NFT Ticketing minh bạch, AI x Crypto cùng hơn 30 diễn giả đầu ngành. Thời gian: 08h30 - 17h30. Quyền lợi: Bao gồm teabreak, tài liệu hội thảo và quyền truy cập khu vực triển lãm công nghệ cao.'
+        description: 'Diễn đàn công nghệ & ngày hội Web3 lớn nhất năm. Khám phá các xu hướng Layer 1/2, NFT Ticketing minh bạch, AI x Crypto cùng hơn 30 diễn giả đầu ngành. Thời gian: 08h30 - 17h30. Quyền lợi: Bao gồm teabreak, tài liệu hội thảo và quyền truy cập khu vực triển lãm công nghệ cao.',
+        image: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=900&q=80'
       },
       {
         name: 'Concert Indie Mùa Thu 2025',
@@ -207,14 +210,15 @@ async function _migrate(db) {
         venue: 'Sân Khấu Trống Đồng, Hà Nội',
         price: 200000,
         total: 300,
-        description: 'Không gian âm nhạc mộc mạc, gần gũi với những giai điệu Indie lãng mạn giữa lòng thủ đô. Thời gian: 19h00 - 22h00. Chỗ ngồi tự do theo khu vực vé. Vui lòng có mặt trước 30 phút để check-in vé on-chain vào cổng.'
+        description: 'Không gian âm nhạc mộc mạc, gần gũi với những giai điệu Indie lãng mạn giữa lòng thủ đô. Thời gian: 19h00 - 22h00. Chỗ ngồi tự do theo khu vực vé. Vui lòng có mặt trước 30 phút để check-in vé on-chain vào cổng.',
+        image: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=900&q=80'
       },
     ];
 
     for (const ev of events) {
       await db.run(
-        'INSERT INTO events(org,name,date,venue,price,total,remain,description) VALUES(?,?,?,?,?,?,?,?)',
-        [orgId, ev.name, ev.date, ev.venue, ev.price, ev.total, ev.total, ev.description]
+        'INSERT INTO events(org,name,date,venue,price,total,remain,description,image) VALUES(?,?,?,?,?,?,?,?,?)',
+        [orgId, ev.name, ev.date, ev.venue, ev.price, ev.total, ev.total, ev.description, ev.image]
       );
     }
     console.log('[DB] ✓ Seeded: 1 organizer demo + 3 sự kiện mẫu (kèm thông tin chi tiết)');
@@ -228,6 +232,19 @@ async function _migrate(db) {
       else if (e.name.includes('Blockchain')) d = 'Diễn đàn công nghệ & ngày hội Web3 lớn nhất năm. Khám phá các xu hướng Layer 1/2, NFT Ticketing minh bạch, AI x Crypto cùng hơn 30 diễn giả đầu ngành. Thời gian: 08h30 - 17h30. Quyền lợi: Bao gồm teabreak, tài liệu hội thảo và khu vực triển lãm.';
       else if (e.name.includes('Indie')) d = 'Không gian âm nhạc mộc mạc, gần gũi với những giai điệu Indie lãng mạn giữa lòng thủ đô. Thời gian: 19h00 - 22h00. Chỗ ngồi tự do theo khu vực vé. Vui lòng có mặt trước 30 phút để check-in vé on-chain vào cổng.';
       await db.run('UPDATE events SET description=? WHERE id=?', [d, e.id]);
+    }
+
+    // Backfill image cho các sự kiện cũ chưa có ảnh
+    const emptyImg = await db.all("SELECT id, name FROM events WHERE image IS NULL OR TRIM(image) = ''");
+    for (const e of emptyImg) {
+      let img = 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&w=900&q=80';
+      const n = (e.name || '').toLowerCase();
+      if (n.includes('blockchain') || n.includes('web3') || n.includes('crypto')) {
+        img = 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=900&q=80';
+      } else if (n.includes('indie') || n.includes('acoustic') || n.includes('thu')) {
+        img = 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=900&q=80';
+      }
+      await db.run('UPDATE events SET image=? WHERE id=?', [img, e.id]);
     }
   }
 }

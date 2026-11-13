@@ -34,25 +34,12 @@ const T={open:'🎟️ Sự kiện đang mở bán',mine:'🎫 Vé của tôi (E
 async function load(){[ev,tk,mk,hs]=await Promise.all([api('events'),api('tickets'),api('market'),api('history')]);draw()}
 const hit=o=>(o.name+' '+o.venue).toLowerCase().includes($('#q').value.trim().toLowerCase());
 
-function parseDateBadge(dStr){
- if(!dStr)return{m:'THG --',d:'--'};
- const p=dStr.split('-');
- return{m:'THG '+(p[1]||'--'),d:p[2]||'--'};
-}
-
-function bannerTheme(name){
- const n=String(name||'').toLowerCase();
- if(n.includes('blockchain')||n.includes('web3')||n.includes('crypto'))return{cls:'crypto',icon:'⛓️',tag:'Web3 & Tech'};
- if(n.includes('indie')||n.includes('acoustic')||n.includes('thu'))return{cls:'indie',icon:'🎸',tag:'Indie & Acoustic'};
- return{cls:'music',icon:'🎵',tag:'Live Concert'};
-}
-
 function renderHero(list){
  if(tab!=='open'||!list.length)return'';
- const topEv=list[0];
- return `<div class="hero-banner">
+ const topEv=list[0],imgUrl=getEventImg(topEv),th=bannerTheme(topEv.name);
+ return `<div class="hero-banner" style="background-image:linear-gradient(90deg, rgba(15,23,42,0.92) 0%, rgba(15,23,42,0.8) 55%, rgba(15,23,42,0.35) 100%), url('${esc(imgUrl)}')">
   <div class="hero-content">
-   <div class="hero-tag">🔥 ĐẠI NHẠC HỘI TIÊU ĐIỂM · CHÍNH HÃNG</div>
+   <div class="hero-tag">🔥 ĐẠI NHẠC HỘI TIÊU ĐIỂM · ${th.tag}</div>
    <h2 class="hero-title">${esc(topEv.name)}</h2>
    <p class="hero-desc">Bảo chứng bởi Avalanche NFT. Mã QR động xoay mỗi 20 giây chống vé chụp màn hình. Mua vé an toàn 100% với xác thực OTP Email.</p>
    <div class="hero-meta">
@@ -67,7 +54,9 @@ function renderHero(list){
     <button class="btn ghost" onclick="viewDetail(${topEv.id},'open')">👁️ Xem chi tiết show</button>
    </div>
   </div>
-  <div class="hero-art">🎸</div>
+  <div class="hero-poster-preview">
+   <img src="${esc(imgUrl)}" alt="${esc(topEv.name)}">
+  </div>
  </div>`;
 }
 
@@ -78,15 +67,16 @@ function draw(){
  if(tab==='history'){$('#wrapList').innerHTML=renderHistory(hs);return}
 
  const L=tab==='open'?ev.filter(hit).map(e=>{
-  const th=bannerTheme(e.name),db=parseDateBadge(e.date);
+  const th=bannerTheme(e.name),db=parseDateBadge(e.date),imgUrl=getEventImg(e);
   return `<article class=card>
-   <div class="event-poster ${th.cls}">
+   <div class="event-poster ${th.cls}" style="background-image:linear-gradient(180deg, rgba(15,23,42,0.15) 0%, rgba(15,23,42,0.75) 100%), url('${esc(imgUrl)}')">
+    <div class=event-poster-overlay></div>
     <div class=date-badge>
      <div class=month>${db.m}</div>
      <div class=day>${db.d}</div>
     </div>
     <span class="poster-tag ${e.remain>0?'':'out'}">${e.remain>0?'⚡ ĐANG MỞ BÁN':'SOLD OUT'}</span>
-    <div class=event-poster-icon>${th.icon}</div>
+    <span class=event-poster-genre>${th.icon} ${th.tag}</span>
    </div>
    <div class=card-content>
     <h3>${esc(e.name)}</h3>
@@ -111,15 +101,16 @@ function draw(){
   </article>`;
  })
  :tab==='mine'?tk.filter(hit).map(t=>{
-  const th=bannerTheme(t.name),db=parseDateBadge(t.date);
+  const th=bannerTheme(t.name),db=parseDateBadge(t.date),imgUrl=getEventImg(t);
   return `<article class="card e-ticket">
-   <div class="event-poster ${th.cls}" style="height:120px">
+   <div class="event-poster ${th.cls}" style="height:130px;background-image:linear-gradient(180deg, rgba(15,23,42,0.2) 0%, rgba(15,23,42,0.8) 100%), url('${esc(imgUrl)}')">
+    <div class=event-poster-overlay></div>
     <div class=date-badge>
      <div class=month>${db.m}</div>
      <div class=day>${db.d}</div>
     </div>
     <span class="poster-tag">${t.token_id?`💎 NFT #${t.token_id}`:'🎟️ Vé #'+t.id}</span>
-    <div class=event-poster-icon style="font-size:45px">${th.icon}</div>
+    <span class=event-poster-genre>${th.icon} ${th.tag}</span>
    </div>
    <div class=card-content>
     <h3>${esc(t.name)} <small>#${t.id}</small></h3>
@@ -145,15 +136,16 @@ function draw(){
   </article>`;
  })
  :mk.filter(hit).map(t=>{
-  const th=bannerTheme(t.name),db=parseDateBadge(t.date);
+  const th=bannerTheme(t.name),db=parseDateBadge(t.date),imgUrl=getEventImg(t);
   return `<article class=card>
-   <div class="event-poster ${th.cls}">
+   <div class="event-poster ${th.cls}" style="background-image:linear-gradient(180deg, rgba(15,23,42,0.15) 0%, rgba(15,23,42,0.75) 100%), url('${esc(imgUrl)}')">
+    <div class=event-poster-overlay></div>
     <div class=date-badge>
      <div class=month>${db.m}</div>
      <div class=day>${db.d}</div>
     </div>
     <span class="poster-tag">🔄 CHỢ VÉ THỨ CẤP</span>
-    <div class=event-poster-icon>${th.icon}</div>
+    <span class=event-poster-genre>${th.icon} ${th.tag}</span>
    </div>
    <div class=card-content>
     <h3>${esc(t.name)} <small>#${t.id}</small></h3>
@@ -182,9 +174,13 @@ function viewDetail(id,src){
  const o=src==='open'?ev.find(x=>x.id===id):src==='mine'?tk.find(x=>x.id===id):mk.find(x=>x.id===id);
  if(!o)return;
  const price=src==='open'?o.price:src==='mine'?o.orig:o.listed;
- openModal(`<h2>Thông tin chi tiết ${src==='open'?'sự kiện':'vé'}</h2>
+ const imgUrl=getEventImg(o);
+ openModal(`
+  <div class="modal-banner" style="background-image:linear-gradient(180deg, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.85) 100%), url('${esc(imgUrl)}')">
+   <div class=modal-banner-tag>${src==='open'?'🎪 Sự kiện chính thức':src==='mine'?'🎫 Vé của bạn':'🔄 Chợ vé thứ cấp'}</div>
+  </div>
+  <h2>${esc(o.name)}</h2>
   <table class=info>
-   <tr><th>Sự kiện</th><td><b>${esc(o.name)}</b></td></tr>
    ${src==='open'?`<tr><th>Nhà tổ chức</th><td>${esc(o.org)}</td></tr>`:''}
    ${src==='mine'?`<tr><th>Mã vé</th><td>#${o.id} ${o.token_id?`<span class="badge nft">💎 NFT #${o.token_id}</span>`:''}</td></tr><tr><th>Trạng thái</th><td>${o.used?'<span class="badge ok">✅ Đã check-in</span>':o.listed?`<span class=badge>🔄 Đang rao bán ${vnd(o.listed)}</span>`:'<span class="badge ok">🎫 Đang sở hữu</span>'}</td></tr>`:''}
    ${src==='market'?`<tr><th>Người bán lại</th><td>${esc(o.seller)}</td></tr><tr><th>Giá gốc</th><td>${vnd(o.orig)}</td></tr>`:''}

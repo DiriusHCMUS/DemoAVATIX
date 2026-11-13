@@ -219,11 +219,21 @@ route('get', 'events', true, () => db.all(evSql + ' ORDER BY e.date'));
 route('post', 'events', 'organizer', async r => {
   const b = r.body, name = String(b.name || '').trim(), venue = String(b.venue || '').trim();
   const desc = String(b.description || '').trim();
+  const image = String(b.image || '').trim();
   if (!name || !venue) throw E('Nhập đủ tên sự kiện và địa điểm');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(b.date || '') || b.date < new Date().toISOString().slice(0, 10)) throw E('Ngày tổ chức không hợp lệ');
   const price = int(b.price, 0, 100000000, 'Giá vé không hợp lệ'), total = int(b.total, 1, 100000, 'Số lượng vé phải là số nguyên dương');
-  await db.run('INSERT INTO events(org,name,date,venue,price,total,remain,description) VALUES(?,?,?,?,?,?,?,?)', [r.u.id, name, b.date, venue, price, total, total, desc]);
+  await db.run('INSERT INTO events(org,name,date,venue,price,total,remain,description,image) VALUES(?,?,?,?,?,?,?,?,?)', [r.u.id, name, b.date, venue, price, total, total, desc, image]);
   return { ok: 1 };
+});
+
+route('post', 'events/:id/image', 'organizer', async r => {
+  const evId = +r.params.id;
+  const ev = await db.get('SELECT * FROM events WHERE id=? AND org=?', [evId, r.u.id]);
+  if (!ev) throw E('Không tìm thấy sự kiện hoặc bạn không có quyền sửa sự kiện này', 404);
+  const image = String(r.body.image || '').trim();
+  await db.run('UPDATE events SET image=? WHERE id=?', [image, evId]);
+  return { ok: 1, image };
 });
 
 route('get', 'stats', 'organizer', async r => {
@@ -285,7 +295,7 @@ route('post', 'buy', 'customer', async r => {
 
 // ─── Tickets & Market ─────────────────────────────────────────────────────────
 route('get', 'tickets', 'customer', r => db.all(
-  'SELECT t.*,e.name,e.date,e.venue,e.description,u.username org FROM tickets t JOIN events e ON e.id=t.event JOIN users u ON u.id=e.org WHERE t.owner=? ORDER BY t.id DESC', [r.u.id]
+  'SELECT t.*,e.name,e.date,e.venue,e.description,e.image,u.username org FROM tickets t JOIN events e ON e.id=t.event JOIN users u ON u.id=e.org WHERE t.owner=? ORDER BY t.id DESC', [r.u.id]
 ));
 
 route('get', 'tickets/:id/chain', true, async r => {
@@ -320,7 +330,7 @@ route('post', 'unlist', 'customer', async r => {
 });
 
 route('get', 'market', 'customer', () => db.all(
-  'SELECT t.id,t.owner,t.listed,t.orig,t.token_id,t.tx_hash,e.name,e.date,e.venue,e.description,u.username seller FROM tickets t JOIN events e ON e.id=t.event JOIN users u ON u.id=t.owner WHERE t.listed IS NOT NULL AND t.used=0'
+  'SELECT t.id,t.owner,t.listed,t.orig,t.token_id,t.tx_hash,e.name,e.date,e.venue,e.description,e.image,u.username seller FROM tickets t JOIN events e ON e.id=t.event JOIN users u ON u.id=t.owner WHERE t.listed IS NOT NULL AND t.used=0'
 ));
 
 // ─── Buy Resale ───────────────────────────────────────────────────────────────

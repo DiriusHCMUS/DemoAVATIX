@@ -68,7 +68,16 @@ function draw(){
    </div>
    <label>Địa điểm tổ chức</label><input id=v placeholder="Ví dụ: Nhà Hát Lớn, Hà Nội" required>
    <label>Số lượng vé phát hành</label><input id=t type=number min=1 step=1 placeholder="Ví dụ: 300" required>
-   <label>Thông tin chi tiết sự kiện</label>
+   <label>Ảnh đại diện / Poster sự kiện (URL)</label>
+   <input id=img placeholder="https://images.unsplash.com/... hoặc dán link ảnh bất kỳ" oninput="previewCreateCover(this.value)">
+   <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap">
+    <button type="button" class="btn sm ghost" onclick="setCreatePreset('https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&w=900&q=80')">🎵 EDM Stage</button>
+    <button type="button" class="btn sm ghost" onclick="setCreatePreset('https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=900&q=80')">⛓️ Web3 Tech</button>
+    <button type="button" class="btn sm ghost" onclick="setCreatePreset('https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=900&q=80')">🎸 Indie Acoustic</button>
+    <button type="button" class="btn sm ghost" onclick="setCreatePreset('https://images.unsplash.com/photo-1501386761578-eac5c94b800a?auto=format&fit=crop&w=900&q=80')">🎪 Music Fest</button>
+   </div>
+   <div id=createPreviewBox style="display:none;margin-top:10px;border-radius:12px;height:140px;background-size:cover;background-position:center;border:1px solid var(--border)"></div>
+   <label style="margin-top:12px">Thông tin chi tiết sự kiện</label>
    <textarea id=desc rows=4 placeholder="Mô tả sự kiện, nghệ sĩ tham gia biểu diễn, lịch trình mở cổng, quy định check-in và quyền lợi vé..."></textarea>
    <p class=note>💡 Hệ thống tự động ghi nhận vé lên Smart Contract. Khi số vé về 0, hệ thống tự động khóa mua và hiển thị SOLD OUT. Phí sàn 5% trên mỗi vé bán ra.</p>
    <button class=btn style="width:100%;margin-top:14px;padding:12px">🚀 Đăng sự kiện lên AVA-TIX</button>
@@ -92,15 +101,16 @@ function draw(){
 function list(){
  const k=$('#q').value.trim().toLowerCase(),L=st.filter(e=>(e.name+' '+e.venue).toLowerCase().includes(k));
  $('#list').innerHTML=L.length?L.map(e=>{
-  const th=bannerTheme(e.name),db=parseDateBadge(e.date);
+  const th=bannerTheme(e.name),db=parseDateBadge(e.date),imgUrl=getEventImg(e);
   return `<article class=card>
-   <div class="event-poster ${th.cls}">
+   <div class="event-poster ${th.cls}" style="background-image:linear-gradient(180deg, rgba(15,23,42,0.15) 0%, rgba(15,23,42,0.75) 100%), url('${esc(imgUrl)}')">
+    <div class=event-poster-overlay></div>
     <div class=date-badge>
      <div class=month>${db.m}</div>
      <div class=day>${db.d}</div>
     </div>
     <span class="poster-tag ${e.remain>0?'':'out'}">${e.remain>0?`Còn ${e.remain}/${e.total} vé`:'SOLD OUT'}</span>
-    <div class=event-poster-icon>${th.icon}</div>
+    <span class=event-poster-genre>${th.icon} ${th.tag}</span>
    </div>
    <div class=card-content>
     <h3>${esc(e.name)}</h3>
@@ -121,8 +131,9 @@ function list(){
      <span>Doanh thu<b>${vnd(e.revenue)}</b></span>
      <span>Check-in<b>${e.checked}</b></span>
     </div>
-    <div class=card-action-bar style="margin-top:12px">
-     <button class="btn sm ghost" style="width:100%" onclick="viewOrgDetail(${e.id})">👁️ Xem chi tiết show diễn</button>
+    <div class=card-action-bar style="margin-top:12px;gap:8px">
+     <button class="btn sm ghost" style="flex:1" onclick="viewOrgDetail(${e.id})">👁️ Chi tiết</button>
+     <button class="btn sm ghost" onclick="changeCoverModal(${e.id})" title="Đổi ảnh đại diện / poster của show">🖼️ Đổi ảnh</button>
     </div>
    </div>
   </article>`;
@@ -131,9 +142,13 @@ function list(){
 
 function viewOrgDetail(id){
  const e=st.find(x=>x.id===id);if(!e)return;
- openModal(`<h2>Chi tiết sự kiện</h2>
+ const imgUrl=getEventImg(e);
+ openModal(`
+  <div class="modal-banner" style="background-image:linear-gradient(180deg, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.8) 100%), url('${esc(imgUrl)}')">
+   <div class=modal-banner-tag>🎪 Show của bạn · ID #${e.id}</div>
+  </div>
+  <h2>${esc(e.name)}</h2>
   <table class=info>
-   <tr><th>Tên sự kiện</th><td><b>${esc(e.name)}</b></td></tr>
    <tr><th>Ngày tổ chức</th><td>${dmy(e.date)}</td></tr>
    <tr><th>Địa điểm</th><td>${esc(e.venue)}</td></tr>
    <tr><th>Giá vé</th><td><b style="color:var(--tb-green);font-size:16px">${vnd(e.price)}</b></td></tr>
@@ -146,13 +161,69 @@ function viewOrgDetail(id){
    <h4>Thông tin chi tiết</h4>
    <p>${e.description?esc(e.description):'<i class=note>Chưa có thông tin mô tả chi tiết cho sự kiện này.</i>'}</p>
   </div>
-  <div class=row><button class="btn ghost" onclick=closeModal()>Đóng</button></div>`);
+  <div class=row>
+   <button class="btn ghost" onclick=closeModal()>Đóng</button>
+   <button class="btn sm" onclick="changeCoverModal(${e.id})">🖼️ Đổi ảnh đại diện</button>
+  </div>`);
+}
+
+function previewCreateCover(u){
+ const b=$('#createPreviewBox');if(!b)return;
+ if(u.trim()){b.style.display='block';b.style.backgroundImage=`url('${u.trim()}')`}
+ else{b.style.display='none'}
+}
+function setCreatePreset(u){
+ if($('#img')){$('#img').value=u;previewCreateCover(u)}
+}
+function changeCoverModal(id){
+ const e=st.find(x=>x.id===id);if(!e)return;
+ const curImg=e.image||'';
+ openModal(`<h2>🖼️ Đổi ảnh đại diện show diễn</h2>
+  <p class=note>Sự kiện: <b>${esc(e.name)}</b></p>
+  <label>Link ảnh đại diện / Poster (URL)</label>
+  <input id=newCoverUrl value="${esc(curImg)}" placeholder="https://images.unsplash.com/... hoặc dán link ảnh bất kỳ" oninput="previewCoverModal(this.value)">
+  <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap">
+   <button type="button" class="btn sm ghost" onclick="setPresetCover('https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&w=900&q=80')">🎵 EDM Stage</button>
+   <button type="button" class="btn sm ghost" onclick="setPresetCover('https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=900&q=80')">⛓️ Web3 Tech</button>
+   <button type="button" class="btn sm ghost" onclick="setPresetCover('https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=900&q=80')">🎸 Indie Acoustic</button>
+   <button type="button" class="btn sm ghost" onclick="setPresetCover('https://images.unsplash.com/photo-1501386761578-eac5c94b800a?auto=format&fit=crop&w=900&q=80')">🎪 Music Fest</button>
+  </div>
+  <div id=coverPreviewBox style="margin-top:12px;border-radius:12px;height:150px;background-size:cover;background-position:center;border:1px solid var(--border);${curImg?`background-image:url('${esc(curImg)}')`:'display:none'}"></div>
+  <div class=row style="margin-top:16px">
+   <button class="btn ghost" onclick=closeModal()>Hủy</button>
+   <button class=btn onclick="saveCover(${e.id})">💾 Lưu thay đổi</button>
+  </div>`);
+}
+function previewCoverModal(u){
+ const b=$('#coverPreviewBox');if(!b)return;
+ if(u.trim()){b.style.display='block';b.style.backgroundImage=`url('${u.trim()}')`}
+ else{b.style.display='none'}
+}
+function setPresetCover(u){
+ if($('#newCoverUrl')){$('#newCoverUrl').value=u;previewCoverModal(u)}
+}
+async function saveCover(id){
+ const img=$('#newCoverUrl').value.trim();
+ try{
+  await api('events/'+id+'/image',{image:img});
+  closeModal();
+  toast('Đã cập nhật ảnh đại diện show thành công!');
+  load();
+ }catch(x){toast(x.message,1)}
 }
 
 async function create(e){
  e.preventDefault();
  try{
-  await api('events',{name:$('#n').value.trim(),date:$('#d').value,venue:$('#v').value.trim(),price:num($('#p').value),total:Number($('#t').value),description:$('#desc').value.trim()});
+  await api('events',{
+   name:$('#n').value.trim(),
+   date:$('#d').value,
+   venue:$('#v').value.trim(),
+   price:num($('#p').value),
+   total:Number($('#t').value),
+   description:$('#desc').value.trim(),
+   image:$('#img')?$('#img').value.trim():''
+  });
   toast('Đã tạo sự kiện thành công!');tab='stats';load();
  }catch(x){toast(x.message,1)}
 }

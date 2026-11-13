@@ -387,7 +387,10 @@ route('get', 'history', true, async r => {
 
 // ─── Static + Error handler ───────────────────────────────────────────────────
 app.use(express.static(__dirname + '/public', { index: 'login.html' }));
-app.use((e, r, s, n) => s.status(e.c || 500).json({ e: e.c ? e.message : 'Lỗi máy chủ' }));
+app.use((e, r, s, n) => {
+  console.error('[API Error]', e);
+  s.status(e.c || 500).json({ e: e.message || 'Lỗi máy chủ' });
+});
 
 // ─── Startup ──────────────────────────────────────────────────────────────────
 if (require.main === module) {

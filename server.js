@@ -7,7 +7,7 @@ const mailer = require('./mailer');
 const db = require('./db');  // ← dual-mode DB (Turso cloud hoặc SQLite local)
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 const SECRET = process.env.SECRET || 'avatix-dev-secret-doi-khi-deploy';
 const FEE = 0.05, CAP = 1.1, METHODS = ['momo', 'bank', 'vnpay', 'vietqr'];
 

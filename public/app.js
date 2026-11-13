@@ -27,14 +27,14 @@ function showChainInfo(){
     <div class=row><button class="btn ghost" onclick=closeModal()>Đóng</button></div>`);
 }
 function renderHistory(rows){
-  const labels={topup:'Nạp tiền',buy:'Mua vé',sale:'Bán vé',list:'Đăng bán lại',scan:'Soát vé',verify_email:'Xác thực Email',security:'Bảo mật / Mật khẩu'};
-  if(!rows.length)return '<div class="card empty">Chưa có giao dịch nào.</div>';
+  const labels={topup:'💰 Nạp tiền',buy:'🎟️ Mua vé',sale:'💵 Bán vé',list:'🔄 Đăng bán lại',scan:'📷 Soát vé',verify_email:'✉️ Xác thực Email',security:'🔐 Bảo mật / Đổi MK'};
+  if(!rows.length)return '<div class="card empty">Chưa có giao dịch nào trong lịch sử.</div>';
   return `<div class="card tbl-wrap"><table class=hist>
-    <thead><tr><th>Thời gian</th><th>Loại</th><th>Số tiền</th><th>Chi tiết</th><th>Minh chứng On-chain</th></tr></thead>
+    <thead><tr><th>Thời gian</th><th>Loại giao dịch</th><th>Số tiền</th><th>Chi tiết</th><th>Minh chứng On-chain</th></tr></thead>
     <tbody>${rows.map(tx=>`<tr>
       <td>${esc(tx.at)}</td>
       <td><span class=badge>${esc(labels[tx.type]||tx.type)}</span></td>
-      <td><b>${tx.amount>0?'+'+vnd(tx.amount):tx.amount<0?'-'+vnd(Math.abs(tx.amount)):'—'}</b></td>
+      <td><b style="color:${tx.amount>0?'#059669':tx.amount<0?'#dc2626':'inherit'}">${tx.amount>0?'+'+vnd(tx.amount):tx.amount<0?'-'+vnd(Math.abs(tx.amount)):'—'}</b></td>
       <td>${esc(tx.note)}</td>
       <td>${txHtml(tx.tx_hash,tx.explorerUrl)}</td>
     </tr>`).join('')}</tbody>
@@ -44,15 +44,22 @@ function renderTop(me,role){
   const c=me.chain||{};
   const pill=c.enabled?`⛓️ ${esc(c.networkName)}`:'⛓️ Off-chain';
   const secBtn=me.emailVerified
-    ?`<button class="chain-pill on" onclick=openSecurityModal() title="Email đã xác thực · Đổi mật khẩu">✓ Email · Đổi MK</button>`
+    ?`<button class="chain-pill on" onclick=openSecurityModal() title="Email đã xác thực · Đổi mật khẩu">🛡️ Bảo mật &amp; Email</button>`
     :`<button class="chain-pill warn" onclick=openSecurityModal() title="Xác thực email & Đổi mật khẩu">⚠️ Xác thực Email</button>`;
-  $('#top').innerHTML=`<div class=logo><span>AVA</span>-TIX</div>
-    <button class="chain-pill ${c.enabled?'on':'off'}" onclick=showChainInfo() title="Xem thông tin Smart Contract">${pill}</button>
-    ${secBtn}
-    <span>${role==='customer'?'Khách hàng':'Nhà cung cấp'}: <b>${esc(me.username)}</b></span>
-    <span class=bal>Ví: <span id=bal></span></span>
-    <button class="btn sm" onclick=topup()>Nạp tiền</button>
-    <button class="btn sm ghost" onclick=logout()>Đăng xuất</button>`;
+  $('#top').innerHTML=`
+    <div class=top-left>
+      <div class=logo onclick="location.reload()"><span>AVA</span>-TIX</div>
+      <button class="chain-pill ${c.enabled?'on':'off'}" onclick=showChainInfo() title="Xem thông tin Smart Contract">${pill}</button>
+    </div>
+    <div class=top-right>
+      ${secBtn}
+      <div class=top-user title="${role==='customer'?'Khách hàng':'Nhà cung cấp'}">
+        <span>👤 <b>${esc(me.username)}</b> <small style="color:#94a3b8">(${role==='customer'?'Khách':'BTC'})</small></span>
+      </div>
+      <div class=bal><span>💰</span> Ví: <span id=bal></span></div>
+      <button class="btn sm" onclick=topup()>+ Nạp tiền</button>
+      <button class="btn sm ghost" onclick=logout() title="Đăng xuất">Đăng xuất</button>
+    </div>`;
   setBal(me);
 }
 function openSecurityModal(){

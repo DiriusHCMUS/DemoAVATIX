@@ -2,33 +2,95 @@
 <body><header class=top id=top></header><main class=wrap><div class=tabs id=tabs></div><div id=body></div></main>
 <script src=app.js></script><script>
 let tab='stats',st=[],hs=[];
-const T={stats:'Thống kê show',create:'Tạo sự kiện',scan:'Soát vé',history:'Lịch sử on-chain'};
+const T={stats:'📊 Thống kê show',create:'➕ Tạo sự kiện',scan:'📷 Soát vé tại cổng',history:'⛓️ Lịch sử On-chain'};
 (async()=>{window.me=await init('organizer');if(me)load()})();
 async function load(){[st,hs]=await Promise.all([api('stats'),api('history')]);draw()}
+
+function bannerTheme(name){
+ const n=String(name||'').toLowerCase();
+ if(n.includes('blockchain')||n.includes('web3')||n.includes('crypto'))return{cls:'crypto',icon:'⛓️',tag:'Web3 & Tech'};
+ if(n.includes('indie')||n.includes('acoustic')||n.includes('thu'))return{cls:'indie',icon:'🎸',tag:'Indie & Acoustic'};
+ return{cls:'music',icon:'🎵',tag:'Live Concert'};
+}
+
 function draw(){
  $('#tabs').innerHTML=Object.entries(T).map(([k,v])=>`<button class="${k===tab?'on':''}" onclick="tab='${k}';draw()">${v}</button>`).join('');
  const b=$('#body');
  if(tab==='stats'){
   const S=k=>st.reduce((a,e)=>a+e[k],0);
-  b.innerHTML=`<div class=tiles><div class=card>Tổng show<b>${st.length}</b></div><div class=card>Vé đã bán<b>${S('sold')}/${S('total')}</b></div><div class=card>Doanh thu (sau phí sàn 5%)<b>${vnd(S('revenue'))}</b></div></div>
-  <input id=q style="margin-top:20px" placeholder="Tìm kiếm show theo tên hoặc địa điểm..." oninput=list()><div class=grid id=list></div>`;list();
+  b.innerHTML=`<div class=tiles>
+   <div class=card><span class=tile-label>🎪 Tổng số show diễn</span><b>${st.length}</b></div>
+   <div class=card><span class=tile-label>🎟️ Vé đã phân phối</span><b>${S('sold')}/${S('total')}</b></div>
+   <div class=card><span class=tile-label>💰 Doanh thu thực nhận (95%)</span><b>${vnd(S('revenue'))}</b></div>
+  </div>
+  <div class=search-box><input id=q placeholder="Tìm kiếm show theo tên hoặc địa điểm..." oninput=list()></div>
+  <div class=grid id=list></div>`;
+  list();
  }else if(tab==='create'){
-  b.innerHTML=`<form class=card id=f style="max-width:560px;margin-top:20px"><h2>Tạo sự kiện mới</h2><label>Tên sự kiện</label><input id=n required><label>Ngày tổ chức</label><input id=d type=date min="${new Date().toISOString().slice(0,10)}" required>
-  <label>Địa điểm</label><input id=v required><label>Giá vé (VNĐ)</label><input id=p inputmode=numeric oninput=money(this) required><label>Số lượng vé</label><input id=t type=number min=1 step=1 required>
-  <label>Thông tin chi tiết sự kiện</label><textarea id=desc rows=3 placeholder="Mô tả sự kiện, nghệ sĩ biểu diễn, thời gian mở cổng, quy định check-in, quyền lợi vé..."></textarea>
-  <p class=note>Khi số vé về 0, hệ thống tự hiển thị SOLD OUT và khóa mua vé. Phí sàn 5% trên mỗi vé bán ra.</p><button class=btn>Tạo sự kiện</button></form>`;$('#f').onsubmit=create;
+  b.innerHTML=`<form class=card id=f style="max-width:580px;margin:10px auto;padding:26px">
+   <h2>➕ Tạo sự kiện âm nhạc / Hội thảo mới</h2>
+   <label>Tên sự kiện</label><input id=n placeholder="Ví dụ: Đêm nhạc EDM Summer Fest 2026" required>
+   <div class=row style="gap:14px">
+    <div style="flex:1"><label>Ngày tổ chức</label><input id=d type=date min="${new Date().toISOString().slice(0,10)}" required></div>
+    <div style="flex:1"><label>Giá vé (VNĐ)</label><input id=p inputmode=numeric placeholder="Ví dụ: 200.000" oninput=money(this) required></div>
+   </div>
+   <label>Địa điểm tổ chức</label><input id=v placeholder="Ví dụ: Nhà Hát Lớn, Hà Nội" required>
+   <label>Số lượng vé phát hành</label><input id=t type=number min=1 step=1 placeholder="Ví dụ: 300" required>
+   <label>Thông tin chi tiết sự kiện</label>
+   <textarea id=desc rows=4 placeholder="Mô tả sự kiện, nghệ sĩ tham gia biểu diễn, lịch trình mở cổng, quy định check-in và quyền lợi vé..."></textarea>
+   <p class=note>💡 Hệ thống tự động ghi nhận vé lên Smart Contract. Khi số vé về 0, hệ thống tự động khóa mua và hiển thị SOLD OUT. Phí sàn 5% trên mỗi vé bán ra.</p>
+   <button class=btn style="width:100%;margin-top:14px;padding:12px">🚀 Đăng sự kiện lên AVA-TIX</button>
+  </form>`;
+  $('#f').onsubmit=create;
  }else if(tab==='scan'){
-  b.innerHTML=`<div class=card style="max-width:560px;margin-top:20px"><h2>Soát vé tại cổng</h2><label>Nội dung mã QR (quét bằng đầu đọc/camera rồi dán vào đây)</label><input id=tk placeholder="AVATIX|..."><p><button class=btn id=sc>Kiểm tra vé</button></p><div id=res class=note></div></div>`;$('#sc').onclick=scan;
+  b.innerHTML=`<div class=card style="max-width:540px;margin:10px auto;padding:26px">
+   <h2>📷 Soát vé On-chain tại cổng</h2>
+   <p class=note>Quét mã QR động của khán giả bằng camera / máy quét rồi dán mã vào ô bên dưới:</p>
+   <label>Nội dung mã QR vé</label>
+   <input id=tk placeholder="AVATIX|ticketId|owner|window|signature" style="font-family:ui-monospace,monospace;font-size:13px">
+   <div class=row style="margin-top:16px"><button class=btn id=sc style="width:100%;padding:12px">🔍 Kiểm tra &amp; Check-in vé</button></div>
+   <div id=res class=note style="margin-top:14px"></div>
+  </div>`;
+  $('#sc').onclick=scan;
  }else{
   b.innerHTML=renderHistory(hs);
  }
 }
+
 function list(){
  const k=$('#q').value.trim().toLowerCase(),L=st.filter(e=>(e.name+' '+e.venue).toLowerCase().includes(k));
- $('#list').innerHTML=L.length?L.map(e=>`<article class=card><h3>${esc(e.name)}</h3><p>${dmy(e.date)} - ${esc(e.venue)}</p><div class=row><b>${vnd(e.price)}</b>${e.remain?'':'<span class="badge out">SOLD OUT</span>'}</div><div class=bar><i style="width:${e.sold/e.total*100}%"></i></div>
- <div class=kv><span>Đã bán<b>${e.sold}/${e.total}</b></span><span>Còn lại<b>${e.remain}</b></span><span>Doanh thu<b>${vnd(e.revenue)}</b></span><span>Đã check-in<b>${e.checked}</b></span><span>Đang bán lại<b>${e.listed}</b></span></div>
- <div class=row style="margin-top:8px"><button class="btn sm ghost" onclick="viewOrgDetail(${e.id})">Chi tiết</button></div></article>`).join(''):'<div class="card empty">Chưa có show nào.</div>';
+ $('#list').innerHTML=L.length?L.map(e=>{
+  const th=bannerTheme(e.name);
+  return `<article class=card>
+   <div class="card-banner ${th.cls}">
+    <span class=banner-icon>${th.icon}</span>
+    <span class=banner-badge>${th.tag}</span>
+   </div>
+   <div class=card-inner>
+    <h3>${esc(e.name)}</h3>
+    <div class=card-meta>
+     <div class=card-meta-item>📅 <span>${dmy(e.date)}</span></div>
+     <div class=card-meta-item>📍 <span>${esc(e.venue)}</span></div>
+    </div>
+    <div class=card-price-row>
+     <div class=card-price>${vnd(e.price)}</div>
+     ${e.remain>0?`<span class="badge ok">Còn ${e.remain}/${e.total} vé</span>`:'<span class="badge out">🚫 SOLD OUT</span>'}
+    </div>
+    <div class=bar><i style="width:${(e.sold/e.total*100)||0}%"></i></div>
+    <div class=kv>
+     <span>Đã bán<b>${e.sold}/${e.total}</b></span>
+     <span>Còn lại<b>${e.remain}</b></span>
+     <span>Doanh thu<b>${vnd(e.revenue)}</b></span>
+     <span>Check-in<b>${e.checked}</b></span>
+    </div>
+    <div class=card-footer style="margin-top:12px">
+     <button class="btn sm ghost" onclick="viewOrgDetail(${e.id})">👁️ Xem chi tiết show</button>
+    </div>
+   </div>
+  </article>`;
+ }).join(''):'<div class="card empty">Chưa có show diễn nào được tạo.</div>';
 }
+
 function viewOrgDetail(id){
  const e=st.find(x=>x.id===id);if(!e)return;
  openModal(`<h2>Chi tiết sự kiện</h2>
@@ -38,7 +100,7 @@ function viewOrgDetail(id){
    <tr><th>Địa điểm</th><td>${esc(e.venue)}</td></tr>
    <tr><th>Giá vé</th><td><b>${vnd(e.price)}</b></td></tr>
    <tr><th>Số lượng vé</th><td>${e.total} vé (còn ${e.remain})</td></tr>
-   <tr><th>Doanh thu</th><td><b>${vnd(e.revenue)}</b></td></tr>
+   <tr><th>Doanh thu (95%)</th><td><b style="color:#059669">${vnd(e.revenue)}</b></td></tr>
    <tr><th>Đã check-in</th><td><b>${e.checked}</b> vé</td></tr>
    <tr><th>Đang rao bán lại</th><td><b>${e.listed}</b> vé</td></tr>
   </table>
@@ -48,7 +110,15 @@ function viewOrgDetail(id){
   </div>
   <div class=row><button class="btn ghost" onclick=closeModal()>Đóng</button></div>`);
 }
-async function create(e){e.preventDefault();try{await api('events',{name:$('#n').value.trim(),date:$('#d').value,venue:$('#v').value.trim(),price:num($('#p').value),total:Number($('#t').value),description:$('#desc').value.trim()});toast('Đã tạo sự kiện');tab='stats';load()}catch(x){toast(x.message,1)}}
+
+async function create(e){
+ e.preventDefault();
+ try{
+  await api('events',{name:$('#n').value.trim(),date:$('#d').value,venue:$('#v').value.trim(),price:num($('#p').value),total:Number($('#t').value),description:$('#desc').value.trim()});
+  toast('Đã tạo sự kiện thành công!');tab='stats';load();
+ }catch(x){toast(x.message,1)}
+}
+
 async function scan(){
  $('#sc').disabled=true;$('#sc').textContent='Đang kiểm tra...';
  try{
@@ -57,6 +127,6 @@ async function scan(){
   $('#res').innerHTML=esc(r.msg)+(r.txHash?`<br>On-chain: ${txHtml(r.txHash,r.explorerUrl)}`:'');
   load();
  }catch(x){$('#res').className='note err';$('#res').textContent=x.message}
- finally{if($('#sc')){$('#sc').disabled=false;$('#sc').textContent='Kiểm tra vé'}}
+ finally{if($('#sc')){$('#sc').disabled=false;$('#sc').textContent='🔍 Kiểm tra & Check-in vé'}}
 }
 </script>

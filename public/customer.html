@@ -1,22 +1,99 @@
 <!doctype html><html lang=vi><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>AVA-TIX · Khách hàng</title><link rel=stylesheet href=style.css>
-<body><header class=top id=top></header><main class=wrap><div class=tabs id=tabs></div><input id=q placeholder="Tìm kiếm show theo tên hoặc địa điểm..." oninput=draw()><div id=wrapList></div></main>
+<body><header class=top id=top></header><main class=wrap><div class=tabs id=tabs></div><div class=search-box><input id=q placeholder="Tìm kiếm show âm nhạc, hội thảo blockchain, địa điểm..." oninput=draw()></div><div id=wrapList></div></main>
 <script src=app.js></script><script>
 let tab='open',ev=[],tk=[],mk=[],hs=[];
-const T={open:'Vé đang mở bán',mine:'Vé của tôi',market:'Chợ vé',history:'Lịch sử on-chain'};
+const T={open:'🎟️ Vé đang mở bán',mine:'🎫 Vé của tôi',market:'🔄 Chợ vé thứ cấp',history:'⛓️ Lịch sử On-chain'};
 (async()=>{window.me=await init('customer');if(me)load()})();
 async function load(){[ev,tk,mk,hs]=await Promise.all([api('events'),api('tickets'),api('market'),api('history')]);draw()}
 const hit=o=>(o.name+' '+o.venue).toLowerCase().includes($('#q').value.trim().toLowerCase());
-const info=o=>`<p>Ngày: ${dmy(o.date)}<br>Địa điểm: ${esc(o.venue)}</p>`;
+
+function bannerTheme(name){
+ const n=String(name||'').toLowerCase();
+ if(n.includes('blockchain')||n.includes('web3')||n.includes('crypto'))return{cls:'crypto',icon:'⛓️',tag:'Web3 & Tech'};
+ if(n.includes('indie')||n.includes('acoustic')||n.includes('thu'))return{cls:'indie',icon:'🎸',tag:'Indie & Acoustic'};
+ return{cls:'music',icon:'🎵',tag:'Live Concert'};
+}
+
 function draw(){
  $('#tabs').innerHTML=Object.entries(T).map(([k,v])=>`<button class="${k===tab?'on':''}" onclick="tab='${k}';draw()">${v}</button>`).join('');
- $('#q').hidden=tab==='history';
+ $('#q').parentElement.hidden=tab==='history';
  if(tab==='history'){$('#wrapList').innerHTML=renderHistory(hs);return}
- const L=tab==='open'?ev.filter(hit).map(e=>`<article class=card><h3>${esc(e.name)}</h3>${info(e)}<p class=note>Nhà tổ chức: ${esc(e.org)}</p><div class=row><b>${vnd(e.price)}</b>${e.remain>0?`<span class=badge>Còn ${e.remain}/${e.total}</span>`:'<span class="badge out">SOLD OUT</span>'}</div>
-  <div class=row style="margin-top:auto"><button class="btn sm ghost" onclick="viewDetail(${e.id},'open')">Chi tiết</button><button class="btn sm" ${e.remain>0?'':'disabled'} onclick="confirmBuy('buy',{event:${e.id}},${e.id},'open')">${e.remain>0?'Mua vé':'Hết vé'}</button></div></article>`)
- :tab==='mine'?tk.filter(hit).map(t=>`<article class=card><h3>${esc(t.name)} <small>#${t.id}</small></h3>${info(t)}<div class=row><span>Giá gốc: <b>${vnd(t.orig)}</b></span>${t.token_id?`<span class="badge nft">NFT #${t.token_id}</span>`:''}${t.used?'<span class="badge ok">Đã check-in</span>':t.listed?`<span class=badge>Đang bán ${vnd(t.listed)}</span>`:'<span class=badge>Đang sở hữu</span>'}</div>
-  <div class=row style="margin-top:auto"><button class="btn sm ghost" onclick="viewDetail(${t.id},'mine')">Chi tiết</button>${t.used?'':`<button class="btn sm" onclick=qr(${t.id})>Mã QR</button>${t.listed?`<button class="btn sm red" onclick=unlist(${t.id})>Hủy bán</button>`:`<button class="btn sm ghost" onclick=resale(${t.id})>Bán lại</button>`}`}${t.token_id?`<button class="btn sm ghost" onclick=viewChain(${t.id})>On-chain</button>`:''}</div></article>`)
- :mk.filter(hit).map(t=>`<article class=card><h3>${esc(t.name)} <small>#${t.id}</small></h3>${info(t)}<p class=note>Người bán: ${esc(t.seller)} · Giá gốc ${vnd(t.orig)}</p><div class=row><b>${vnd(t.listed)}</b>${t.token_id?`<span class="badge nft">NFT #${t.token_id}</span>`:''}</div>
-  <div class=row style="margin-top:auto"><button class="btn sm ghost" onclick="viewDetail(${t.id},'market')">Chi tiết</button>${t.owner===me.id?'<span class=badge>Vé của bạn</span>':`<button class="btn sm" onclick="confirmBuy('buy-resale',{ticket:${t.id}},${t.id},'market')">Mua lại vé</button>`}</div></article>`);
+
+ const L=tab==='open'?ev.filter(hit).map(e=>{
+  const th=bannerTheme(e.name);
+  return `<article class=card>
+   <div class="card-banner ${th.cls}">
+    <span class=banner-icon>${th.icon}</span>
+    <span class=banner-badge>${th.tag}</span>
+   </div>
+   <div class=card-inner>
+    <h3>${esc(e.name)}</h3>
+    <div class=card-meta>
+     <div class=card-meta-item>📅 <span>${dmy(e.date)}</span></div>
+     <div class=card-meta-item>📍 <span>${esc(e.venue)}</span></div>
+     <div class=card-meta-item>🏢 <span>${esc(e.org)}</span></div>
+    </div>
+    <div class=card-price-row>
+     <div class=card-price>${vnd(e.price)}</div>
+     ${e.remain>0?`<span class="badge ok">⚡ Còn ${e.remain}/${e.total}</span>`:'<span class="badge out">🚫 SOLD OUT</span>'}
+    </div>
+    <div class=card-footer>
+     <button class="btn sm ghost" onclick="viewDetail(${e.id},'open')">👁️ Chi tiết</button>
+     <button class="btn sm" ${e.remain>0?'':'disabled'} onclick="confirmBuy('buy',{event:${e.id}},${e.id},'open')">${e.remain>0?'🛒 Mua vé':'Hết vé'}</button>
+    </div>
+   </div>
+  </article>`;
+ })
+ :tab==='mine'?tk.filter(hit).map(t=>{
+  const th=bannerTheme(t.name);
+  return `<article class=card>
+   <div class="card-banner ${th.cls}">
+    <span class=banner-icon>${th.icon}</span>
+    <span class=banner-badge>${t.token_id?`💎 NFT #${t.token_id}`:'🎟️ Vé #'+t.id}</span>
+   </div>
+   <div class=card-inner>
+    <h3>${esc(t.name)} <small>#${t.id}</small></h3>
+    <div class=card-meta>
+     <div class=card-meta-item>📅 <span>${dmy(t.date)}</span></div>
+     <div class=card-meta-item>📍 <span>${esc(t.venue)}</span></div>
+    </div>
+    <div class=card-price-row>
+     <div>Giá gốc: <b>${vnd(t.orig)}</b></div>
+     ${t.used?'<span class="badge ok">✅ Đã check-in</span>':t.listed?`<span class=badge>🔄 Rao bán ${vnd(t.listed)}</span>`:'<span class="badge ok">🎫 Đang sở hữu</span>'}
+    </div>
+    <div class=card-footer>
+     <button class="btn sm ghost" onclick="viewDetail(${t.id},'mine')">👁️ Chi tiết</button>
+     ${t.used?'':`<button class="btn sm" onclick=qr(${t.id})>📱 Mã QR</button>${t.listed?`<button class="btn sm red" onclick=unlist(${t.id})>❌ Hủy bán</button>`:`<button class="btn sm ghost" onclick=resale(${t.id})>🔄 Bán lại</button>`}`}
+     ${t.token_id?`<button class="btn sm ghost" onclick=viewChain(${t.id})>🔗 On-chain</button>`:''}
+    </div>
+   </div>
+  </article>`;
+ })
+ :mk.filter(hit).map(t=>{
+  const th=bannerTheme(t.name);
+  return `<article class=card>
+   <div class="card-banner ${th.cls}">
+    <span class=banner-icon>${th.icon}</span>
+    <span class=banner-badge>${t.token_id?`💎 NFT #${t.token_id}`:'🔄 Chợ vé'}</span>
+   </div>
+   <div class=card-inner>
+    <h3>${esc(t.name)} <small>#${t.id}</small></h3>
+    <div class=card-meta>
+     <div class=card-meta-item>📅 <span>${dmy(t.date)}</span></div>
+     <div class=card-meta-item>📍 <span>${esc(t.venue)}</span></div>
+     <div class=card-meta-item>👤 Người bán: <span>${esc(t.seller)}</span> (Gốc: ${vnd(t.orig)})</div>
+    </div>
+    <div class=card-price-row>
+     <div class=card-price style="color:var(--primary)">${vnd(t.listed)}</div>
+     <span class="badge nft">Vé bán lại</span>
+    </div>
+    <div class=card-footer>
+     <button class="btn sm ghost" onclick="viewDetail(${t.id},'market')">👁️ Chi tiết</button>
+     ${t.owner===me.id?'<span class=badge>Vé của bạn</span>':`<button class="btn sm" onclick="confirmBuy('buy-resale',{ticket:${t.id}},${t.id},'market')">🛒 Mua lại vé</button>`}
+    </div>
+   </div>
+  </article>`;
+ });
  $('#wrapList').innerHTML=`<div class=grid>${L.length?L.join(''):'<div class="card empty">Không có kết quả phù hợp.</div>'}</div>`;
 }
 
@@ -28,7 +105,7 @@ function viewDetail(id,src){
   <table class=info>
    <tr><th>Sự kiện</th><td><b>${esc(o.name)}</b></td></tr>
    ${src==='open'?`<tr><th>Nhà tổ chức</th><td>${esc(o.org)}</td></tr>`:''}
-   ${src==='mine'?`<tr><th>Mã vé</th><td>#${o.id} ${o.token_id?`<span class="badge nft">NFT #${o.token_id}</span>`:''}</td></tr><tr><th>Trạng thái</th><td>${o.used?'<span class="badge ok">Đã check-in</span>':o.listed?`<span class=badge>Đang rao bán ${vnd(o.listed)}</span>`:'<span class=badge>Đang sở hữu</span>'}</td></tr>`:''}
+   ${src==='mine'?`<tr><th>Mã vé</th><td>#${o.id} ${o.token_id?`<span class="badge nft">💎 NFT #${o.token_id}</span>`:''}</td></tr><tr><th>Trạng thái</th><td>${o.used?'<span class="badge ok">✅ Đã check-in</span>':o.listed?`<span class=badge>🔄 Đang rao bán ${vnd(o.listed)}</span>`:'<span class="badge ok">🎫 Đang sở hữu</span>'}</td></tr>`:''}
    ${src==='market'?`<tr><th>Người bán lại</th><td>${esc(o.seller)}</td></tr><tr><th>Giá gốc</th><td>${vnd(o.orig)}</td></tr>`:''}
    <tr><th>Ngày tổ chức</th><td>${dmy(o.date)}</td></tr>
    <tr><th>Địa điểm</th><td>${esc(o.venue)}</td></tr>
@@ -41,9 +118,9 @@ function viewDetail(id,src){
   </div>
   <div class=row>
    <button class="btn ghost" onclick=closeModal()>Đóng</button>
-   ${src==='open'&&o.remain>0?`<button class=btn onclick="confirmBuy('buy',{event:${o.id}},${o.id},'open')">Mua vé ngay</button>`:''}
-   ${src==='market'&&o.owner!==me.id?`<button class=btn onclick="confirmBuy('buy-resale',{ticket:${o.id}},${o.id},'market')">Mua lại vé</button>`:''}
-   ${src==='mine'&&!o.used?`<button class=btn onclick="qr(${o.id})">Mở mã QR</button>`:''}
+   ${src==='open'&&o.remain>0?`<button class=btn onclick="confirmBuy('buy',{event:${o.id}},${o.id},'open')">🛒 Mua vé ngay</button>`:''}
+   ${src==='market'&&o.owner!==me.id?`<button class=btn onclick="confirmBuy('buy-resale',{ticket:${o.id}},${o.id},'market')">🛒 Mua lại vé</button>`:''}
+   ${src==='mine'&&!o.used?`<button class=btn onclick="qr(${o.id})">📱 Mở mã QR</button>`:''}
   </div>`);
 }
 
@@ -163,8 +240,8 @@ async function viewChain(id){
   const d=await api('tickets/'+id+'/chain');const oc=d.onChain;
   openModal(`<h2>Minh chứng Vé NFT #${d.ticket.token_id}</h2>
    <table class=info>
-    <tr><th>Sự kiện</th><td>${esc(d.ticket.name)}</td></tr>
-    <tr><th>Mạng</th><td>${esc(d.chainStatus.networkName)}</td></tr>
+    <tr><th>Sự kiện</th><td><b>${esc(d.ticket.name)}</b></td></tr>
+    <tr><th>Mạng</th><td><b>${esc(d.chainStatus.networkName)}</b></td></tr>
     <tr><th>Contract NFT</th><td class=mono>${esc(d.chainStatus.avaTicketAddress||'—')}</td></tr>
     <tr><th>Giao dịch gần nhất</th><td>${txHtml(d.ticket.tx_hash,d.explorerUrl)}</td></tr>
     ${oc?`<tr><th>Chủ sở hữu (On-chain)</th><td class=mono>${esc(oc.owner)}</td></tr>

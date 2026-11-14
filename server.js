@@ -253,8 +253,8 @@ route('post', 'events/:id/cancel', 'organizer', async r => {
   await db.run('UPDATE users SET balance=balance-? WHERE id=?', [orgDeduct, r.u.id]);
   await log(r.u.id, 'refund', -orgDeduct, `Hoàn trả doanh thu: Hủy show "${ev.name}" (${tickets.length} vé)`);
 
-  // Đổi trạng thái sự kiện sang cancelled và số vé còn lại về 0
-  await db.run("UPDATE events SET status='cancelled', remain=0 WHERE id=?", [evId]);
+  // Đổi trạng thái sự kiện sang cancelled (giữ nguyên tồn kho cũ để tránh lỗi tính sai số vé đã bán)
+  await db.run("UPDATE events SET status='cancelled' WHERE id=?", [evId]);
 
   return { ok: 1, refundedTickets: tickets.length, totalRefund };
 });
@@ -272,10 +272,29 @@ route('get', 'stats', 'organizer', async r => {
   const events = await db.all('SELECT * FROM events WHERE org=? ORDER BY date', [r.u.id]);
   const result = [];
   for (const e of events) {
-    const sold = e.total - e.remain;
+    const isCancelled = e.status === 'cancelled';
     const checked = await db.get('SELECT COUNT(*) c FROM tickets WHERE event=? AND used=1', [e.id]);
     const listed  = await db.get('SELECT COUNT(*) c FROM tickets WHERE event=? AND listed IS NOT NULL AND used=0', [e.id]);
-    result.push({ ...e, sold, revenue: Math.round(sold * e.price * (1 - FEE)), checked: checked.c, listed: listed.c });
+    const activeSoldRow = await db.get('SELECT COUNT(*) c FROM tickets WHERE event=? AND used != 2', [e.id]);
+    const refundedRow   = await db.get('SELECT COUNT(*) c FROM tickets WHERE event=? AND used=2', [e.id]);
+
+    const activeSold = activeSoldRow?.c || 0;
+    const refunded   = refundedRow?.c || 0;
+
+    // Show đã hủy:
+    // 1) Số vé đã phân phối hiện tại = 0 (toàn bộ vé đã bán trước đó đã hoàn tiền 100%)
+    // 2) Doanh thu thực nhận = 0đ (doanh thu đã được khấu trừ hoàn lại cho khán giả)
+    const sold = isCancelled ? 0 : (activeSold > 0 ? activeSold : Math.max(0, e.total - e.remain));
+    const revenue = isCancelled ? 0 : Math.round(sold * e.price * (1 - FEE));
+
+    result.push({
+      ...e,
+      sold,
+      refunded,
+      revenue,
+      checked: isCancelled ? 0 : checked.c,
+      listed: isCancelled ? 0 : listed.c
+    });
   }
   return result;
 });

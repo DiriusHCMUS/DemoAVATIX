@@ -50,11 +50,29 @@ function draw(){
  $('#tabs').innerHTML=Object.entries(T).map(([k,v])=>`<button class="${k===tab?'on':''}" onclick="tab='${k}';draw()">${v}</button>`).join('');
  const b=$('#body');
  if(tab==='stats'){
-  const S=k=>st.reduce((a,e)=>a+e[k],0);
+  const activeShows = st.filter(e => e.status !== 'cancelled');
+  const cancelledShows = st.filter(e => e.status === 'cancelled');
+  const totalActiveSold = activeShows.reduce((a, e) => a + (e.sold || 0), 0);
+  const totalActiveCap = activeShows.reduce((a, e) => a + (e.total || 0), 0);
+  const totalActiveRev = activeShows.reduce((a, e) => a + (e.revenue || 0), 0);
+  const totalRefunded = st.reduce((a, e) => a + (e.refunded || 0), 0);
+
   b.innerHTML=`<div class=tiles>
-   <div class=card><span class=tile-label>🎪 Tổng số show diễn</span><b>${st.length}</b></div>
-   <div class=card><span class=tile-label>🎟️ Vé đã phân phối</span><b>${S('sold')}/${S('total')}</b></div>
-   <div class=card><span class=tile-label>💰 Doanh thu thực nhận (95%)</span><b>${vnd(S('revenue'))}</b></div>
+   <div class=card>
+     <span class=tile-label>🎪 Tổng số show diễn</span>
+     <b>${st.length}</b>
+     ${cancelledShows.length > 0 ? `<div style="font-size:12px;color:var(--text-muted);margin-top:4px">${activeShows.length} đang mở · ${cancelledShows.length} đã hủy</div>` : ''}
+   </div>
+   <div class=card>
+     <span class=tile-label>🎟️ Vé đã phân phối</span>
+     <b style="color:var(--tb-green)">${totalActiveSold}/${totalActiveCap || 0}</b>
+     ${cancelledShows.length > 0 ? `<div style="font-size:12px;color:var(--text-muted);margin-top:4px">${totalRefunded > 0 ? `Đã hoàn lại ${totalRefunded} vé (show hủy)` : 'Đã loại trừ các show đã hủy'}</div>` : ''}
+   </div>
+   <div class=card>
+     <span class=tile-label>💰 Doanh thu thực nhận (95%)</span>
+     <b style="color:var(--tb-green)">${vnd(totalActiveRev)}</b>
+     ${cancelledShows.length > 0 ? `<div style="font-size:12px;color:var(--text-muted);margin-top:4px">Đã khấu trừ hoàn tiền các show hủy</div>` : ''}
+   </div>
   </div>
   <div class=search-box><input id=q placeholder="Tìm kiếm show theo tên sự kiện hoặc địa điểm..." oninput=list()></div>
   <div class=grid id=list></div>`;
@@ -142,7 +160,7 @@ function list(){
     ? '<span class="poster-tag out" style="background:#ef4444">❌ ĐÃ HỦY SHOW</span>'
     : `<span class="poster-tag ${e.remain>0?'':'out'}">${e.remain>0?`Còn ${e.remain}/${e.total} vé`:'SOLD OUT'}</span>`;
 
-  return `<article class=card style="${isCancelled?'opacity:0.88;border-color:#fca5a5':''}">
+  return `<article class=card style="${isCancelled?'opacity:0.92;border-color:#fca5a5':''}">
    <div class="event-poster ${th.cls}" style="background-image:linear-gradient(180deg, rgba(15,23,42,0.15) 0%, rgba(15,23,42,0.75) 100%), url('${esc(imgUrl)}')">
     <div class=event-poster-overlay></div>
     <div class=date-badge>
@@ -158,6 +176,7 @@ function list(){
      <div class=event-details-row>📅 <span>${dmy(e.date)}</span></div>
      <div class=event-details-row>📍 <span>${esc(e.venue)}</span></div>
      ${e.max_per_user>0?`<div class=event-details-row>🔒 <span>Giới hạn: <b>Tối đa ${e.max_per_user} vé/tài khoản</b></span></div>`:''}
+     ${isCancelled?`<div class=event-details-row><span style="color:#ef4444;font-weight:600">🚫 Show đã hủy · Hoàn tiền 100% cho khán giả</span></div>`:''}
     </div>
     <div class=card-action-bar style="border-top:none;padding-top:4px">
      <div class=price-block>
@@ -165,16 +184,23 @@ function list(){
       <span class=price-amount>${vnd(e.price)}</span>
      </div>
     </div>
-    <div class=bar><i style="width:${(e.sold/e.total*100)||0}%"></i></div>
+    <div class=bar><i style="width:${isCancelled ? 0 : ((e.sold/e.total*100)||0)}%"></i></div>
     <div class=kv>
-     <span>Đã bán<b>${e.sold}/${e.total}</b></span>
-     <span>Còn lại<b>${isCancelled?0:e.remain}</b></span>
-     <span>Doanh thu<b>${vnd(e.revenue)}</b></span>
-     <span>Check-in<b>${e.checked}</b></span>
+     ${isCancelled ? `
+       <span>Đã bán<b>0/${e.total}</b></span>
+       <span>Hoàn trả<b>${e.refunded || 0} vé</b></span>
+       <span>Doanh thu<b>0đ</b></span>
+       <span>Trạng thái<b style="color:#ef4444">Đã hủy</b></span>
+     ` : `
+       <span>Đã bán<b>${e.sold}/${e.total}</b></span>
+       <span>Còn lại<b>${e.remain}</b></span>
+       <span>Doanh thu<b>${vnd(e.revenue)}</b></span>
+       <span>Check-in<b>${e.checked}</b></span>
+     `}
     </div>
     <div class=card-action-bar style="margin-top:12px;gap:6px;flex-wrap:wrap">
      ${isCancelled
-       ? `<span class="badge out" style="width:100%;text-align:center;padding:8px">🚫 Show đã hủy · Đã hoàn tiền 100% cho khán giả</span>`
+       ? `<button class="btn sm ghost" style="width:100%" onclick="viewOrgDetail(${e.id})">👁️ Xem chi tiết show đã hủy</button>`
        : `<button class="btn sm ghost" style="flex:1" onclick="viewOrgDetail(${e.id})">👁️ Chi tiết</button>
           <button class="btn sm ghost" onclick="changeCoverModal(${e.id})" title="Đổi ảnh đại diện">🖼️ Đổi ảnh</button>
           <button class="btn sm ghost red" onclick="confirmCancelShow(${e.id})" title="Hủy show và tự động hoàn tiền vào ví người mua">🚫 Hủy show</button>`
@@ -200,8 +226,9 @@ function viewOrgDetail(id){
    <tr><th>Địa điểm</th><td>${esc(e.venue)}</td></tr>
    <tr><th>Giới hạn mua</th><td>${e.max_per_user>0?`<b>Tối đa ${e.max_per_user} vé / tài khoản</b>`:'Không giới hạn'}</td></tr>
    <tr><th>Giá vé</th><td><b style="color:var(--tb-green);font-size:16px">${vnd(e.price)}</b></td></tr>
-   <tr><th>Số lượng vé</th><td>${e.total} vé (còn ${isCancelled?0:e.remain})</td></tr>
-   <tr><th>Doanh thu thực nhận (95%)</th><td><b style="color:var(--tb-green);font-size:16px">${vnd(e.revenue)}</b></td></tr>
+   <tr><th>Số lượng vé</th><td>${e.total} vé</td></tr>
+   <tr><th>Vé đã phân phối</th><td><b>${e.sold}/${e.total}</b> vé ${isCancelled ? `<span class="note" style="color:#ef4444">(Đã hoàn trả ${e.refunded || 0} vé)</span>` : ''}</td></tr>
+   <tr><th>Doanh thu thực nhận (95%)</th><td><b style="color:var(--tb-green);font-size:16px">${vnd(e.revenue)}</b> ${isCancelled?'<span class="note">(0đ - Doanh thu đã hoàn trả 100% cho khán giả)</span>':''}</td></tr>
    <tr><th>Đã check-in</th><td><b>${e.checked}</b> vé</td></tr>
    <tr><th>Đang rao bán lại</th><td><b>${e.listed}</b> vé</td></tr>
   </table>
@@ -231,8 +258,8 @@ function confirmCancelShow(id){
   <table class=info>
    <tr><th>Tên sự kiện</th><td><b>${esc(e.name)}</b></td></tr>
    <tr><th>Ngày tổ chức</th><td>${dmy(e.date)}</td></tr>
-   <tr><th>Số vé đã bán</th><td><b>${e.sold} vé</b></td></tr>
-   <tr><th>Tổng tiền hoàn lại</th><td><b style="color:var(--tb-red);font-size:16px">${vnd(e.sold * e.price)}</b></td></tr>
+   <tr><th>Số vé đã bán cần hoàn tiền</th><td><b>${e.sold} vé</b></td></tr>
+   <tr><th>Tổng tiền hoàn lại cho khán giả</th><td><b style="color:var(--tb-red);font-size:16px">${vnd(e.sold * e.price)}</b></td></tr>
   </table>
   <div class=row style="margin-top:20px">
    <button class="btn ghost" onclick=closeModal()>Quay lại</button>

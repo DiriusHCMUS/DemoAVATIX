@@ -27,7 +27,7 @@ function showChainInfo(){
     <div class=row><button class="btn ghost" onclick=closeModal()>Đóng</button></div>`);
 }
 function renderHistory(rows){
-  const labels={topup:'💰 Nạp tiền',buy:'🎟️ Mua vé',sale:'💵 Bán vé',list:'🔄 Đăng bán lại',scan:'📷 Soát vé',verify_email:'✉️ Xác thực Email',security:'🔐 Bảo mật / Đổi MK'};
+  const labels={topup:'💰 Nạp tiền',buy:'🎟️ Mua vé',sale:'💵 Bán vé',list:'🔄 Đăng bán lại',scan:'📷 Soát vé',refund:'↩️ Hoàn tiền',verify_email:'✉️ Xác thực Email',security:'🔐 Bảo mật / Đổi MK'};
   if(!rows.length)return '<div class="card empty">Chưa có giao dịch nào trong lịch sử.</div>';
   return `<div class="card tbl-wrap"><table class=hist>
     <thead><tr><th>Thời gian</th><th>Loại giao dịch</th><th>Số tiền</th><th>Chi tiết</th><th>Minh chứng On-chain</th></tr></thead>

@@ -220,11 +220,43 @@ route('post', 'events', 'organizer', async r => {
   const b = r.body, name = String(b.name || '').trim(), venue = String(b.venue || '').trim();
   const desc = String(b.description || '').trim();
   const image = String(b.image || '').trim();
+  const maxPerUser = Math.max(0, parseInt(b.max_per_user, 10) || 0);
   if (!name || !venue) throw E('Nhập đủ tên sự kiện và địa điểm');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(b.date || '') || b.date < new Date().toISOString().slice(0, 10)) throw E('Ngày tổ chức không hợp lệ');
   const price = int(b.price, 0, 100000000, 'Giá vé không hợp lệ'), total = int(b.total, 1, 100000, 'Số lượng vé phải là số nguyên dương');
-  await db.run('INSERT INTO events(org,name,date,venue,price,total,remain,description,image) VALUES(?,?,?,?,?,?,?,?,?)', [r.u.id, name, b.date, venue, price, total, total, desc, image]);
+  await db.run('INSERT INTO events(org,name,date,venue,price,total,remain,description,image,status,max_per_user) VALUES(?,?,?,?,?,?,?,?,?,\'active\',?)', [r.u.id, name, b.date, venue, price, total, total, desc, image, maxPerUser]);
   return { ok: 1 };
+});
+
+route('post', 'events/:id/cancel', 'organizer', async r => {
+  const evId = +r.params.id;
+  const ev = await db.get('SELECT * FROM events WHERE id=? AND org=?', [evId, r.u.id]);
+  if (!ev) throw E('Không tìm thấy sự kiện hoặc bạn không có quyền hủy sự kiện này', 404);
+  if (ev.status === 'cancelled') throw E('Sự kiện này đã được hủy trước đó rồi');
+
+  // Lấy tất cả vé chưa bị hoàn tiền
+  const tickets = await db.all('SELECT * FROM tickets WHERE event=? AND used != 2', [evId]);
+  let totalRefund = 0;
+
+  for (const t of tickets) {
+    totalRefund += t.orig;
+    // Hoàn 100% tiền vé về ví người đang sở hữu vé
+    await db.run('UPDATE users SET balance=balance+? WHERE id=?', [t.orig, t.owner]);
+    // Đánh dấu vé đã hoàn tiền (used=2), hủy niêm yết bán lại
+    await db.run('UPDATE tickets SET used=2, listed=NULL WHERE id=?', [t.id]);
+    // Ghi log giao dịch hoàn tiền cho khán giả
+    await log(t.owner, 'refund', t.orig, `Hoàn tiền 100%: Show "${ev.name}" bị hủy (Vé #${t.id})`);
+  }
+
+  // Trừ doanh thu tương ứng từ tài khoản BTC
+  const orgDeduct = Math.round(totalRefund * (1 - FEE));
+  await db.run('UPDATE users SET balance=balance-? WHERE id=?', [orgDeduct, r.u.id]);
+  await log(r.u.id, 'refund', -orgDeduct, `Hoàn trả doanh thu: Hủy show "${ev.name}" (${tickets.length} vé)`);
+
+  // Đổi trạng thái sự kiện sang cancelled và số vé còn lại về 0
+  await db.run("UPDATE events SET status='cancelled', remain=0 WHERE id=?", [evId]);
+
+  return { ok: 1, refundedTickets: tickets.length, totalRefund };
 });
 
 route('post', 'events/:id/image', 'organizer', async r => {
@@ -279,7 +311,15 @@ route('post', 'buy', 'customer', async r => {
   const eventId = +r.body.event;
   const e = await db.get('SELECT * FROM events WHERE id=?', [eventId]);
   if (!e) throw E('Không tìm thấy sự kiện');
+  if (e.status === 'cancelled') throw E('Sự kiện này đã bị hủy, không thể mua vé');
   if (e.remain <= 0) throw E('Sự kiện đã SOLD OUT');
+
+  if (e.max_per_user > 0) {
+    const row = await db.get('SELECT COUNT(*) cnt FROM tickets WHERE event=? AND owner=? AND used != 2', [e.id, r.u.id]);
+    if ((row?.cnt || 0) >= e.max_per_user) {
+      throw E(`Chống gom vé: Sự kiện này giới hạn mỗi khán giả chỉ được mua tối đa ${e.max_per_user} vé`);
+    }
+  }
   const { buyerTxId, sellerTxId } = await pay(r.u.id, e.org, e.price, e.name);
   await db.run('UPDATE events SET remain=remain-1 WHERE id=?', [eventId]);
   const ins = await db.run('INSERT INTO tickets(event,owner,orig) VALUES(?,?,?)', [eventId, r.u.id, e.price]);
@@ -295,7 +335,7 @@ route('post', 'buy', 'customer', async r => {
 
 // ─── Tickets & Market ─────────────────────────────────────────────────────────
 route('get', 'tickets', 'customer', r => db.all(
-  'SELECT t.*,e.name,e.date,e.venue,e.description,e.image,u.username org FROM tickets t JOIN events e ON e.id=t.event JOIN users u ON u.id=e.org WHERE t.owner=? ORDER BY t.id DESC', [r.u.id]
+  'SELECT t.*,e.name,e.date,e.venue,e.description,e.image,e.status event_status,e.max_per_user,u.username org FROM tickets t JOIN events e ON e.id=t.event JOIN users u ON u.id=e.org WHERE t.owner=? ORDER BY t.id DESC', [r.u.id]
 ));
 
 route('get', 'tickets/:id/chain', true, async r => {
@@ -330,7 +370,7 @@ route('post', 'unlist', 'customer', async r => {
 });
 
 route('get', 'market', 'customer', () => db.all(
-  'SELECT t.id,t.owner,t.listed,t.orig,t.token_id,t.tx_hash,e.name,e.date,e.venue,e.description,e.image,u.username seller FROM tickets t JOIN events e ON e.id=t.event JOIN users u ON u.id=t.owner WHERE t.listed IS NOT NULL AND t.used=0'
+  'SELECT t.id,t.owner,t.listed,t.orig,t.token_id,t.tx_hash,e.name,e.date,e.venue,e.description,e.image,e.max_per_user,u.username seller FROM tickets t JOIN events e ON e.id=t.event JOIN users u ON u.id=t.owner WHERE t.listed IS NOT NULL AND t.used=0 AND (e.status != \'cancelled\' OR e.status IS NULL)'
 ));
 
 // ─── Buy Resale ───────────────────────────────────────────────────────────────
@@ -340,9 +380,18 @@ route('post', 'buy-resale', 'customer', async r => {
   await verifyOtp(r.u.id, 'buy_ticket', code);
 
   const ticketId = +r.body.ticket;
-  const t = await db.get('SELECT t.*,e.name FROM tickets t JOIN events e ON e.id=t.event WHERE t.id=? AND t.listed IS NOT NULL AND t.used=0', [ticketId]);
+  const t = await db.get('SELECT t.*,e.name,e.status event_status,e.max_per_user FROM tickets t JOIN events e ON e.id=t.event WHERE t.id=? AND t.listed IS NOT NULL AND t.used=0', [ticketId]);
   if (!t) throw E('Vé không còn được rao bán');
+  if (t.event_status === 'cancelled') throw E('Sự kiện này đã bị hủy, không thể giao dịch vé');
   if (t.owner === r.u.id) throw E('Không thể tự mua vé của mình');
+
+  if (t.max_per_user > 0) {
+    const row = await db.get('SELECT COUNT(*) cnt FROM tickets WHERE event=? AND owner=? AND used != 2', [t.event, r.u.id]);
+    if ((row?.cnt || 0) >= t.max_per_user) {
+      throw E(`Chống gom vé: Bạn đã sở hữu tối đa ${t.max_per_user} vé của sự kiện này`);
+    }
+  }
+
   const { buyerTxId, sellerTxId } = await pay(r.u.id, t.owner, t.listed, t.name + ' (bán lại)');
   await db.run('UPDATE tickets SET owner=?,listed=NULL WHERE id=?', [r.u.id, ticketId]);
   let chainRes = null;
@@ -364,6 +413,7 @@ const W = () => Math.floor(Date.now() / (STEP * 1000)),
 route('get', 'qr/:id', 'customer', async r => {
   const t = await db.get('SELECT * FROM tickets WHERE id=? AND owner=?', [+r.params.id, r.u.id]);
   if (!t) throw E('Bạn không sở hữu vé này');
+  if (t.used === 2) throw E('Sự kiện đã bị hủy và tiền vé đã được hoàn trả vào ví của bạn');
   if (t.used) throw E('Vé đã được sử dụng');
   const token = tok(t, W());
   const svg = await QR.toString(token, { type: 'svg', errorCorrectionLevel: 'H', margin: 2, width: 360 });
@@ -378,6 +428,7 @@ route('post', 'scan', 'organizer', async r => {
   const t = await db.get('SELECT t.*,e.org,e.name FROM tickets t JOIN events e ON e.id=t.event WHERE t.id=?', [+id]);
   if (!t || t.org !== r.u.id) throw E('Vé không thuộc sự kiện của bạn');
   if (t.owner !== +own) throw E('Vé đã đổi chủ, mã cũ không còn hiệu lực');
+  if (t.used === 2) throw E('Vé không hợp lệ: Sự kiện đã bị hủy và tiền vé đã hoàn trả cho khán giả');
   if (t.used) throw E('Vé đã được sử dụng trước đó');
   await db.run('UPDATE tickets SET used=1,listed=NULL WHERE id=?', [t.id]);
   let chainRes = null;

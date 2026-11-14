@@ -109,7 +109,9 @@ async function _migrate(db) {
        id INTEGER PRIMARY KEY,
        org INTEGER, name TEXT, date TEXT, venue TEXT,
        price INTEGER, total INTEGER, remain INTEGER,
-       description TEXT, image TEXT
+       description TEXT, image TEXT,
+       status TEXT DEFAULT 'active',
+       max_per_user INTEGER DEFAULT 0
      )`,
     `CREATE TABLE IF NOT EXISTS tickets(
        id INTEGER PRIMARY KEY,
@@ -140,6 +142,8 @@ async function _migrate(db) {
     { check: `PRAGMA table_info(users)`,   col: 'email_verified', sql: `ALTER TABLE users   ADD COLUMN email_verified INTEGER DEFAULT 0` },
     { check: `PRAGMA table_info(events)`,  col: 'description',    sql: `ALTER TABLE events  ADD COLUMN description TEXT` },
     { check: `PRAGMA table_info(events)`,  col: 'image',          sql: `ALTER TABLE events  ADD COLUMN image TEXT` },
+    { check: `PRAGMA table_info(events)`,  col: 'status',         sql: `ALTER TABLE events  ADD COLUMN status TEXT DEFAULT 'active'` },
+    { check: `PRAGMA table_info(events)`,  col: 'max_per_user',   sql: `ALTER TABLE events  ADD COLUMN max_per_user INTEGER DEFAULT 0` },
     { check: `PRAGMA table_info(tickets)`, col: 'token_id',       sql: `ALTER TABLE tickets ADD COLUMN token_id INTEGER` },
     { check: `PRAGMA table_info(tickets)`, col: 'tx_hash',        sql: `ALTER TABLE tickets ADD COLUMN tx_hash TEXT` },
     { check: `PRAGMA table_info(tickets)`, col: 'contract_addr',  sql: `ALTER TABLE tickets ADD COLUMN contract_addr TEXT` },
@@ -217,8 +221,8 @@ async function _migrate(db) {
 
     for (const ev of events) {
       await db.run(
-        'INSERT INTO events(org,name,date,venue,price,total,remain,description,image) VALUES(?,?,?,?,?,?,?,?,?)',
-        [orgId, ev.name, ev.date, ev.venue, ev.price, ev.total, ev.total, ev.description, ev.image]
+        'INSERT INTO events(org,name,date,venue,price,total,remain,description,image,status,max_per_user) VALUES(?,?,?,?,?,?,?,?,?,\'active\',?)',
+        [orgId, ev.name, ev.date, ev.venue, ev.price, ev.total, ev.total, ev.description, ev.image, ev.max_per_user || 2]
       );
     }
     console.log('[DB] ✓ Seeded: 1 organizer demo + 3 sự kiện mẫu (kèm thông tin chi tiết)');
@@ -246,6 +250,10 @@ async function _migrate(db) {
       }
       await db.run('UPDATE events SET image=? WHERE id=?', [img, e.id]);
     }
+
+    // Backfill status và max_per_user cho các sự kiện cũ
+    await db.run("UPDATE events SET status='active' WHERE status IS NULL OR TRIM(status) = ''");
+    await db.run("UPDATE events SET max_per_user=2 WHERE max_per_user IS NULL OR max_per_user = 0");
   }
 
   // ── Đảm bảo 2 tài khoản demo luôn sẵn sàng cho Giám khảo trải nghiệm ────

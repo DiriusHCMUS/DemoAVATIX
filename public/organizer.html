@@ -87,7 +87,15 @@ function draw(){
    <div id=createPreviewBox style="display:none;margin-top:10px;border-radius:12px;height:150px;background-size:cover;background-position:center;border:1px solid var(--border);position:relative">
     <span style="position:absolute;bottom:8px;left:8px;background:rgba(0,0,0,0.7);color:#fff;padding:2px 8px;border-radius:4px;font-size:11px">Xem trước ảnh đại diện</span>
    </div>
-   <label style="margin-top:12px">Thông tin chi tiết sự kiện</label>
+   <label style="margin-top:12px">Giới hạn số vé mỗi tài khoản (Chống gom vé / Bot)</label>
+   <select id=maxPerUser style="padding:10px;border-radius:10px;border:1px solid var(--border);width:100%;font-size:14px;background:#fff;margin-bottom:12px">
+     <option value="0">🌐 Không giới hạn (Vô hạn vé - Hội thảo/Sự kiện mở)</option>
+     <option value="1">🔒 Tối đa 1 vé / tài khoản (Show hot / Chống phe vé tối đa)</option>
+     <option value="2" selected>👥 Tối đa 2 vé / tài khoản (Khuyên dùng - Đi theo cặp)</option>
+     <option value="4">👨‍👩‍👧‍👦 Tối đa 4 vé / tài khoản (Đi theo nhóm bạn)</option>
+     <option value="6">🎟️ Tối đa 6 vé / tài khoản</option>
+   </select>
+   <label>Thông tin chi tiết sự kiện</label>
    <textarea id=desc rows=4 placeholder="Mô tả sự kiện, nghệ sĩ tham gia biểu diễn, lịch trình mở cổng, quy định check-in và quyền lợi vé..."></textarea>
    <p class=note>💡 Hệ thống tự động ghi nhận vé lên Smart Contract. Khi số vé về 0, hệ thống tự động khóa mua và hiển thị SOLD OUT. Phí sàn 5% trên mỗi vé bán ra.</p>
    <button class=btn style="width:100%;margin-top:14px;padding:12px">🚀 Đăng sự kiện lên AVA-TIX</button>
@@ -129,14 +137,19 @@ function list(){
  const k=$('#q').value.trim().toLowerCase(),L=st.filter(e=>(e.name+' '+e.venue).toLowerCase().includes(k));
  $('#list').innerHTML=L.length?L.map(e=>{
   const th=bannerTheme(e.name),db=parseDateBadge(e.date),imgUrl=getEventImg(e);
-  return `<article class=card>
+  const isCancelled = e.status === 'cancelled';
+  const tagHtml = isCancelled
+    ? '<span class="poster-tag out" style="background:#ef4444">❌ ĐÃ HỦY SHOW</span>'
+    : `<span class="poster-tag ${e.remain>0?'':'out'}">${e.remain>0?`Còn ${e.remain}/${e.total} vé`:'SOLD OUT'}</span>`;
+
+  return `<article class=card style="${isCancelled?'opacity:0.88;border-color:#fca5a5':''}">
    <div class="event-poster ${th.cls}" style="background-image:linear-gradient(180deg, rgba(15,23,42,0.15) 0%, rgba(15,23,42,0.75) 100%), url('${esc(imgUrl)}')">
     <div class=event-poster-overlay></div>
     <div class=date-badge>
      <div class=month>${db.m}</div>
      <div class=day>${db.d}</div>
     </div>
-    <span class="poster-tag ${e.remain>0?'':'out'}">${e.remain>0?`Còn ${e.remain}/${e.total} vé`:'SOLD OUT'}</span>
+    ${tagHtml}
     <span class=event-poster-genre>${th.icon} ${th.tag}</span>
    </div>
    <div class=card-content>
@@ -144,6 +157,7 @@ function list(){
     <div class=event-details>
      <div class=event-details-row>📅 <span>${dmy(e.date)}</span></div>
      <div class=event-details-row>📍 <span>${esc(e.venue)}</span></div>
+     ${e.max_per_user>0?`<div class=event-details-row>🔒 <span>Giới hạn: <b>Tối đa ${e.max_per_user} vé/tài khoản</b></span></div>`:''}
     </div>
     <div class=card-action-bar style="border-top:none;padding-top:4px">
      <div class=price-block>
@@ -154,13 +168,17 @@ function list(){
     <div class=bar><i style="width:${(e.sold/e.total*100)||0}%"></i></div>
     <div class=kv>
      <span>Đã bán<b>${e.sold}/${e.total}</b></span>
-     <span>Còn lại<b>${e.remain}</b></span>
+     <span>Còn lại<b>${isCancelled?0:e.remain}</b></span>
      <span>Doanh thu<b>${vnd(e.revenue)}</b></span>
      <span>Check-in<b>${e.checked}</b></span>
     </div>
-    <div class=card-action-bar style="margin-top:12px;gap:8px">
-     <button class="btn sm ghost" style="flex:1" onclick="viewOrgDetail(${e.id})">👁️ Chi tiết</button>
-     <button class="btn sm ghost" onclick="changeCoverModal(${e.id})" title="Đổi ảnh đại diện / poster của show">🖼️ Đổi ảnh</button>
+    <div class=card-action-bar style="margin-top:12px;gap:6px;flex-wrap:wrap">
+     ${isCancelled
+       ? `<span class="badge out" style="width:100%;text-align:center;padding:8px">🚫 Show đã hủy · Đã hoàn tiền 100% cho khán giả</span>`
+       : `<button class="btn sm ghost" style="flex:1" onclick="viewOrgDetail(${e.id})">👁️ Chi tiết</button>
+          <button class="btn sm ghost" onclick="changeCoverModal(${e.id})" title="Đổi ảnh đại diện">🖼️ Đổi ảnh</button>
+          <button class="btn sm ghost red" onclick="confirmCancelShow(${e.id})" title="Hủy show và tự động hoàn tiền vào ví người mua">🚫 Hủy show</button>`
+     }
     </div>
    </div>
   </article>`;
@@ -170,16 +188,19 @@ function list(){
 function viewOrgDetail(id){
  const e=st.find(x=>x.id===id);if(!e)return;
  const imgUrl=getEventImg(e);
+ const isCancelled = e.status === 'cancelled';
  openModal(`
   <div class="modal-banner" style="background-image:linear-gradient(180deg, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.8) 100%), url('${esc(imgUrl)}')">
    <div class=modal-banner-tag>🎪 Show của bạn · ID #${e.id}</div>
   </div>
-  <h2>${esc(e.name)}</h2>
+  <h2>${esc(e.name)} ${isCancelled?'<span class="badge out">❌ Đã hủy show</span>':''}</h2>
   <table class=info>
+   <tr><th>Trạng thái</th><td>${isCancelled?'<b style="color:#ef4444">Đã hủy show (Đã hoàn 100% tiền vé cho khán giả)</b>':'<span class="badge ok">Đang mở bán</span>'}</td></tr>
    <tr><th>Ngày tổ chức</th><td>${dmy(e.date)}</td></tr>
    <tr><th>Địa điểm</th><td>${esc(e.venue)}</td></tr>
+   <tr><th>Giới hạn mua</th><td>${e.max_per_user>0?`<b>Tối đa ${e.max_per_user} vé / tài khoản</b>`:'Không giới hạn'}</td></tr>
    <tr><th>Giá vé</th><td><b style="color:var(--tb-green);font-size:16px">${vnd(e.price)}</b></td></tr>
-   <tr><th>Số lượng vé</th><td>${e.total} vé (còn ${e.remain})</td></tr>
+   <tr><th>Số lượng vé</th><td>${e.total} vé (còn ${isCancelled?0:e.remain})</td></tr>
    <tr><th>Doanh thu thực nhận (95%)</th><td><b style="color:var(--tb-green);font-size:16px">${vnd(e.revenue)}</b></td></tr>
    <tr><th>Đã check-in</th><td><b>${e.checked}</b> vé</td></tr>
    <tr><th>Đang rao bán lại</th><td><b>${e.listed}</b> vé</td></tr>
@@ -188,10 +209,49 @@ function viewOrgDetail(id){
    <h4>Thông tin chi tiết</h4>
    <p>${e.description?esc(e.description):'<i class=note>Chưa có thông tin mô tả chi tiết cho sự kiện này.</i>'}</p>
   </div>
-  <div class=row>
+  <div class=row style="gap:8px">
    <button class="btn ghost" onclick=closeModal()>Đóng</button>
-   <button class="btn sm" onclick="changeCoverModal(${e.id})">🖼️ Đổi ảnh đại diện</button>
+   ${isCancelled?'':`<button class="btn sm" onclick="changeCoverModal(${e.id})">🖼️ Đổi ảnh</button>
+   <button class="btn sm red" onclick="confirmCancelShow(${e.id})">🚫 Hủy show &amp; Hoàn tiền</button>`}
   </div>`);
+}
+
+function confirmCancelShow(id){
+ const e = st.find(x => x.id === id); if(!e) return;
+ openModal(`<h2>🚫 Xác nhận HỦY SHOW DIỄN</h2>
+  <div style="background:rgba(239,68,68,0.08);border:1px solid #ef4444;border-radius:12px;padding:16px;margin:14px 0">
+   <b style="color:#ef4444;font-size:16px">⚠️ CẢNH BÁO QUAN TRỌNG:</b>
+   <p style="margin:8px 0 0;font-size:14px;line-height:1.6">
+    Hành động hủy show là <b>không thể hoàn tác</b>. Khi xác nhận:<br>
+    • Hệ thống tự động kích hoạt Escrow hoàn <b>100% tiền vé</b> về ví của tất cả khán giả đã mua.<br>
+    • Toàn bộ vé phát hành của show này sẽ tự động vô hiệu hóa.<br>
+    • Số vé đã bán sẽ tự động quy hồi doanh thu từ tài khoản Ban tổ chức.
+   </p>
+  </div>
+  <table class=info>
+   <tr><th>Tên sự kiện</th><td><b>${esc(e.name)}</b></td></tr>
+   <tr><th>Ngày tổ chức</th><td>${dmy(e.date)}</td></tr>
+   <tr><th>Số vé đã bán</th><td><b>${e.sold} vé</b></td></tr>
+   <tr><th>Tổng tiền hoàn lại</th><td><b style="color:var(--tb-red);font-size:16px">${vnd(e.sold * e.price)}</b></td></tr>
+  </table>
+  <div class=row style="margin-top:20px">
+   <button class="btn ghost" onclick=closeModal()>Quay lại</button>
+   <button class="btn red" id=btnDoCancel onclick="doCancelShow(${e.id})">🚨 Xác nhận Hủy show &amp; Hoàn tiền ngay</button>
+  </div>`);
+}
+
+async function doCancelShow(id){
+ const btn = $('#btnDoCancel');
+ if(btn){ btn.disabled = true; btn.textContent = 'Đang xử lý hoàn tiền...'; }
+ try{
+  const res = await api('events/' + id + '/cancel', {});
+  closeModal();
+  toast(`Đã hủy show thành công! Đã hoàn 100% tiền (${vnd(res.totalRefund)}) cho ${res.refundedTickets} vé.`);
+  load();
+ }catch(x){
+  toast(x.message, 1);
+  if(btn){ btn.disabled = false; btn.textContent = '🚨 Xác nhận Hủy show & Hoàn tiền ngay'; }
+ }
 }
 
 function previewCreateCover(u){
@@ -287,6 +347,7 @@ async function create(e){
    venue:$('#v').value.trim(),
    price:num($('#p').value),
    total:Number($('#t').value),
+   max_per_user:Number($('#maxPerUser')?$('#maxPerUser').value:0)||0,
    description:$('#desc').value.trim(),
    image:$('#img')?$('#img').value.trim():''
   });

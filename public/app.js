@@ -2,7 +2,17 @@ const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>
 const dots=n=>String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g,'.'),vnd=n=>dots(n)+'đ',dmy=d=>d.split('-').reverse().join('/'),num=v=>parseInt(String(v).replace(/\D/g,''))||0;
 const shortHash=h=>h?h.slice(0,8)+'…'+h.slice(-6):'';
 const money=i=>{const n=num(i.value);i.value=n?dots(n):''};
-async function api(u,b){const r=await fetch('/api/'+u,b===undefined?{}:{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});const d=await r.json().catch(()=>({}));if(!r.ok)throw Object.assign(new Error(d.e||'Có lỗi xảy ra'),{st:r.status});return d}
+async function api(u,b){
+  const r=await fetch('/api/'+u,b===undefined?{}:{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok){
+    if(r.status===401 && !location.pathname.endsWith('login.html')){
+      setTimeout(()=>{ alert(d.e || 'Phiên đăng nhập đã hết hạn'); location.href='login.html'; }, 50);
+    }
+    throw Object.assign(new Error(d.e||'Có lỗi xảy ra'),{st:r.status});
+  }
+  return d;
+}
 function toast(t,bad){const e=document.createElement('div');e.id='toast';e.className=bad?'bad':'';e.textContent=t;document.body.append(e);setTimeout(()=>e.remove(),3600)}
 function openModal(h){$('#m').innerHTML='<div class="mb">'+h+'</div>';$('#m').hidden=false}
 function closeModal(){$('#m').hidden=true;$('#m').innerHTML='';clearInterval(window.tm)}
@@ -69,11 +79,24 @@ function renderTop(me,role){
 function openSecurityModal(){
   const me=window.me||{};
   const role=me.role;
+  const devName = me.currentDevice === 'mobile' ? '📱 Điện thoại di động' : '💻 Máy tính (PC / Laptop)';
+  const activeSess = me.activeSessions || {};
+  const activeList = [
+    activeSess.desktop ? '💻 1 Máy tính' : null,
+    activeSess.mobile  ? '📱 1 Điện thoại' : null
+  ].filter(Boolean).join(' + ') || '1 thiết bị';
+
   openModal(`<h2>Tài khoản &amp; Bảo mật</h2>
     <table class=info>
       <tr><th>Tên đăng nhập</th><td><b>${esc(me.username)}</b></td></tr>
       <tr><th>Email</th><td>${esc(me.email)} ${me.emailVerified?'<span class="badge nft">Đã xác thực</span>':'<span class="badge out">Chưa xác thực</span>'}</td></tr>
+      <tr><th>Thiết bị này</th><td><b>${devName}</b></td></tr>
+      <tr><th>Bảo vệ phiên</th><td><span class="badge ok">1 PC + 1 Mobile song song</span></td></tr>
+      <tr><th>Phiên đang mở</th><td><span style="font-weight:600;color:var(--tb-green)">${esc(activeList)}</span></td></tr>
     </table>
+    <p class="note" style="margin:10px 0 14px;background:rgba(0,177,79,0.06);padding:10px 14px;border-radius:10px;border:1px solid rgba(0,177,79,0.2)">
+      💡 <b>Cơ chế chống gian lận &amp; chia sẻ tài khoản:</b> Hệ thống cho phép duy nhất <b>1 phiên PC</b> và <b>1 phiên Điện thoại</b> cùng lúc. Nếu có thiết bị thứ 2 cùng loại đăng nhập, thiết bị cũ sẽ tự động đăng xuất ngay lập tức để bảo vệ vé của bạn.
+    </p>
     ${me.emailVerified?'':`
       <div class=sec-box>
         <h3>1. Xác thực Email</h3>

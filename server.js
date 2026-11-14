@@ -17,19 +17,63 @@ const E = (m, c = 400) => Object.assign(new Error(m), { c }),
 const cookies = r => Object.fromEntries((r.headers.cookie || '').split('; ').filter(Boolean).map(x => x.split('=')));
 const int = (v, min, max, msg) => { const n = Number(v); if (!Number.isInteger(n) || n < min || n > max) throw E(msg); return n; };
 
+const getDeviceType = req => {
+  const ua = String(req.headers['user-agent'] || '').toLowerCase();
+  if (/mobile|android|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(ua)) {
+    return 'mobile';
+  }
+  return 'desktop';
+};
+
 const auth = role => async (r, s, n) => {
   try {
-    const [id, exp, sg] = (cookies(r).t || '').split('.');
-    if (!sg || sign(id + '.' + exp).slice(0, 32) !== sg || +exp < Date.now()) throw E('Chưa đăng nhập', 401);
-    const u = await db.get('SELECT * FROM users WHERE id=?', [id]);
-    if (!u) throw E('Chưa đăng nhập', 401);
-    if (typeof role === 'string' && u.role !== role) throw E('Không có quyền truy cập', 403);
-    if (!u.wallet) {
-      u.wallet = chain.getWalletAddress(u.id);
-      await db.run('UPDATE users SET wallet=? WHERE id=?', [u.wallet, u.id]);
+    const raw = cookies(r).t || '';
+    if (!raw) throw E('Chưa đăng nhập', 401);
+    const parts = raw.split('.');
+
+    let id, exp, dev, sid, sg;
+
+    if (parts.length === 5) {
+      // Phiên bảo mật kép (1 Mobile + 1 PC): id.exp.dev.sid.sg
+      [id, exp, dev, sid, sg] = parts;
+      const expectedSig = sign(`${id}.${exp}.${dev}.${sid}`).slice(0, 32);
+      if (!sg || expectedSig !== sg || +exp < Date.now()) throw E('Phiên đăng nhập đã hết hạn', 401);
+
+      const u = await db.get('SELECT * FROM users WHERE id=?', [id]);
+      if (!u) throw E('Tài khoản không tồn tại', 401);
+
+      // Kiểm tra phiên đơn nhất theo loại thiết bị (Single Session per Device Type)
+      const currentSid = dev === 'mobile' ? u.session_mobile : u.session_desktop;
+      if (currentSid && currentSid !== sid) {
+        const devName = dev === 'mobile' ? 'điện thoại' : 'máy tính (PC/Laptop)';
+        throw E(`Tài khoản đã đăng nhập trên một ${devName} khác. Phiên này đã tự động đăng xuất để bảo vệ an toàn cho vé.`, 401);
+      }
+
+      if (typeof role === 'string' && u.role !== role) throw E('Không có quyền truy cập', 403);
+      if (!u.wallet) {
+        u.wallet = chain.getWalletAddress(u.id);
+        await db.run('UPDATE users SET wallet=? WHERE id=?', [u.wallet, u.id]);
+      }
+      r.u = u;
+      r.sessionDev = dev;
+      n();
+    } else if (parts.length === 3) {
+      // Tương thích phiên cũ: id.exp.sg
+      [id, exp, sg] = parts;
+      if (!sg || sign(id + '.' + exp).slice(0, 32) !== sg || +exp < Date.now()) throw E('Chưa đăng nhập', 401);
+      const u = await db.get('SELECT * FROM users WHERE id=?', [id]);
+      if (!u) throw E('Chưa đăng nhập', 401);
+      if (typeof role === 'string' && u.role !== role) throw E('Không có quyền truy cập', 403);
+      if (!u.wallet) {
+        u.wallet = chain.getWalletAddress(u.id);
+        await db.run('UPDATE users SET wallet=? WHERE id=?', [u.wallet, u.id]);
+      }
+      r.u = u;
+      r.sessionDev = getDeviceType(r);
+      n();
+    } else {
+      throw E('Chưa đăng nhập', 401);
     }
-    r.u = u;
-    n();
   } catch (e) { n(e); }
 };
 const route = (m, p, role, f) => app[m]('/api/' + p, ...(role ? [auth(role)] : []), (r, s, n) => Promise.resolve().then(() => f(r, s)).then(d => s.json(d)).catch(n));
@@ -49,9 +93,22 @@ const maskEmail = e => {
 };
 const currentUserOpt = async r => {
   try {
-    const [id, exp, sg] = (cookies(r).t || '').split('.');
-    if (!sg || sign(id + '.' + exp).slice(0, 32) !== sg || +exp < Date.now()) return null;
-    return await db.get('SELECT * FROM users WHERE id=?', [id]) || null;
+    const raw = cookies(r).t || '';
+    const parts = raw.split('.');
+    if (parts.length === 5) {
+      const [id, exp, dev, sid, sg] = parts;
+      if (!sg || sign(`${id}.${exp}.${dev}.${sid}`).slice(0, 32) !== sg || +exp < Date.now()) return null;
+      const u = await db.get('SELECT * FROM users WHERE id=?', [id]);
+      if (!u) return null;
+      const currentSid = dev === 'mobile' ? u.session_mobile : u.session_desktop;
+      if (currentSid && currentSid !== sid) return null;
+      return u;
+    } else if (parts.length === 3) {
+      const [id, exp, sg] = parts;
+      if (!sg || sign(id + '.' + exp).slice(0, 32) !== sg || +exp < Date.now()) return null;
+      return await db.get('SELECT * FROM users WHERE id=?', [id]) || null;
+    }
+    return null;
   } catch { return null; }
 };
 const resolveVerifyUser = async r => {
@@ -192,15 +249,57 @@ route('post', 'forgot-password/confirm', 0, async r => {
 route('post', 'login', 0, async (r, s) => {
   const u = await db.get('SELECT * FROM users WHERE username=?', [r.body.username || '']);
   if (!u || hash(r.body.password || '', u.salt) !== u.hash) throw E('Sai tên đăng nhập hoặc mật khẩu', 401);
-  const exp = Date.now() + 864e5, id = u.id + '.' + exp;
-  s.setHeader('Set-Cookie', `t=${id}.${sign(id).slice(0, 32)}; HttpOnly; Path=/; SameSite=Strict; Max-Age=86400`);
-  return { role: u.role, emailVerified: Boolean(u.email_verified) };
+
+  const dev = getDeviceType(r); // 'mobile' | 'desktop'
+  const sid = crypto.randomBytes(16).toString('hex');
+  const exp = Date.now() + 864e5; // 24 giờ
+
+  // Cập nhật phiên đăng nhập theo loại thiết bị (1 PC + 1 Mobile)
+  if (dev === 'mobile') {
+    await db.run('UPDATE users SET session_mobile=? WHERE id=?', [sid, u.id]);
+  } else {
+    await db.run('UPDATE users SET session_desktop=? WHERE id=?', [sid, u.id]);
+  }
+
+  // Cấu trúc token: id.exp.dev.sid.signature
+  const payload = `${u.id}.${exp}.${dev}.${sid}`;
+  const sig = sign(payload).slice(0, 32);
+  s.setHeader('Set-Cookie', `t=${payload}.${sig}; HttpOnly; Path=/; SameSite=Strict; Max-Age=86400`);
+  return { role: u.role, emailVerified: Boolean(u.email_verified), device: dev };
 });
 
-route('post', 'logout', 0, (r, s) => { s.setHeader('Set-Cookie', 't=; Path=/; Max-Age=0'); return { ok: 1 }; });
+route('post', 'logout', 0, async (r, s) => {
+  try {
+    const raw = cookies(r).t || '';
+    const parts = raw.split('.');
+    if (parts.length === 5) {
+      const [id, exp, dev, sid] = parts;
+      if (dev === 'mobile') {
+        await db.run('UPDATE users SET session_mobile=NULL WHERE id=? AND session_mobile=?', [id, sid]);
+      } else {
+        await db.run('UPDATE users SET session_desktop=NULL WHERE id=? AND session_desktop=?', [id, sid]);
+      }
+    }
+  } catch (_) {}
+  s.setHeader('Set-Cookie', 't=; Path=/; Max-Age=0');
+  return { ok: 1 };
+});
+
 route('get', 'me', true, async r => {
   const { hash: _h, salt: _s, cccd: _c, ...u } = r.u;
-  return { ...u, emailVerified: Boolean(r.u.email_verified), smtpEnabled: mailer.isSmtpConfigured(), chainEnabled: chain.isEnabled(), chain: chain.getStatus() };
+  const currentDev = r.sessionDev || getDeviceType(r);
+  return {
+    ...u,
+    emailVerified: Boolean(r.u.email_verified),
+    smtpEnabled: mailer.isSmtpConfigured(),
+    chainEnabled: chain.isEnabled(),
+    chain: chain.getStatus(),
+    currentDevice: currentDev,
+    activeSessions: {
+      desktop: Boolean(u.session_desktop),
+      mobile: Boolean(u.session_mobile)
+    }
+  };
 });
 route('get', 'chain', 0, () => chain.getStatus());
 

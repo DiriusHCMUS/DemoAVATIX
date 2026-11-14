@@ -103,7 +103,9 @@ async function _migrate(db) {
        hash TEXT, salt TEXT, email TEXT, phone TEXT,
        bank TEXT, role TEXT, cccd TEXT,
        wallet TEXT, email_verified INTEGER DEFAULT 0,
-       balance INTEGER DEFAULT 0
+       balance INTEGER DEFAULT 0,
+       session_desktop TEXT DEFAULT NULL,
+       session_mobile TEXT DEFAULT NULL
      )`,
     `CREATE TABLE IF NOT EXISTS events(
        id INTEGER PRIMARY KEY,
@@ -138,8 +140,10 @@ async function _migrate(db) {
 
   // Migration an toàn: thêm cột mới vào bảng cũ
   const migrations = [
-    { check: `PRAGMA table_info(users)`,   col: 'wallet',         sql: `ALTER TABLE users   ADD COLUMN wallet TEXT` },
-    { check: `PRAGMA table_info(users)`,   col: 'email_verified', sql: `ALTER TABLE users   ADD COLUMN email_verified INTEGER DEFAULT 0` },
+    { check: `PRAGMA table_info(users)`,   col: 'wallet',          sql: `ALTER TABLE users   ADD COLUMN wallet TEXT` },
+    { check: `PRAGMA table_info(users)`,   col: 'email_verified',  sql: `ALTER TABLE users   ADD COLUMN email_verified INTEGER DEFAULT 0` },
+    { check: `PRAGMA table_info(users)`,   col: 'session_desktop', sql: `ALTER TABLE users   ADD COLUMN session_desktop TEXT DEFAULT NULL` },
+    { check: `PRAGMA table_info(users)`,   col: 'session_mobile',  sql: `ALTER TABLE users   ADD COLUMN session_mobile TEXT DEFAULT NULL` },
     { check: `PRAGMA table_info(events)`,  col: 'description',    sql: `ALTER TABLE events  ADD COLUMN description TEXT` },
     { check: `PRAGMA table_info(events)`,  col: 'image',          sql: `ALTER TABLE events  ADD COLUMN image TEXT` },
     { check: `PRAGMA table_info(events)`,  col: 'status',         sql: `ALTER TABLE events  ADD COLUMN status TEXT DEFAULT 'active'` },

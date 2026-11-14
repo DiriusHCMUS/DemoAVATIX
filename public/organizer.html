@@ -1,4 +1,4 @@
-<!doctype html><html lang=vi><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>AVA-TIX · Nhà tổ chức sự kiện (Organizer Portal)</title><link rel=stylesheet href=style.css>
+<!doctype html><html lang=vi><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>AVA-TIX · Nhà tổ chức sự kiện (Organizer Portal)</title><link rel=stylesheet href=style.css><script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <body><header class=top id=top></header><main class=wrap><div class=tabs id=tabs></div><div id=body></div></main>
 <footer class=site-footer>
   <div class=footer-wrap>
@@ -46,6 +46,7 @@ function bannerTheme(name){
 }
 
 function draw(){
+ if(tab!=='scan'&&typeof stopCamera==='function')stopCamera();
  $('#tabs').innerHTML=Object.entries(T).map(([k,v])=>`<button class="${k===tab?'on':''}" onclick="tab='${k}';draw()">${v}</button>`).join('');
  const b=$('#body');
  if(tab==='stats'){
@@ -93,15 +94,32 @@ function draw(){
   </form>`;
   $('#f').onsubmit=create;
  }else if(tab==='scan'){
-  b.innerHTML=`<div class=card style="max-width:540px;margin:10px auto;padding:26px">
+  b.innerHTML=`<div class=card style="max-width:560px;margin:10px auto;padding:26px">
    <h2>📷 Soát vé On-chain tại cổng</h2>
-   <p class=note>Quét mã QR động của khán giả bằng camera / máy quét rồi dán mã vào ô bên dưới:</p>
+   <p class=note>Hệ thống tự động giải mã chữ ký mật mã học của QR xoay 20s và ghi nhận trạng thái vé đã sử dụng lên Smart Contract.</p>
+   
+   <div style="margin:16px 0;padding:16px;background:rgba(0,177,79,0.06);border:1px solid rgba(0,177,79,0.3);border-radius:12px">
+     <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px">
+       <button class="btn green" id=btnCamStart style="flex:1;padding:12px;font-size:14px;font-weight:700">📷 Bật Camera quét mã QR</button>
+       <button class="btn ghost red" id=btnCamStop style="display:none;padding:12px;font-size:14px">⏹️ Tắt Camera</button>
+     </div>
+     <div id=camReader style="display:none;margin-top:12px;border-radius:12px;overflow:hidden;border:2px solid var(--tb-green);background:#000"></div>
+     <div id=camStatus class=note style="font-size:12px;text-align:center;margin-top:6px">💡 Hướng camera vào màn hình mã QR động của khán giả</div>
+   </div>
+
+   <div style="position:relative;text-align:center;margin:18px 0">
+     <span style="background:#fff;padding:0 12px;color:var(--text-muted);font-size:12px;position:relative;z-index:2">HOẶC DÁN MÃ THỦ CÔNG</span>
+     <div style="position:absolute;top:50%;left:0;right:0;height:1px;background:var(--border);z-index:1"></div>
+   </div>
+
    <label>Nội dung mã QR vé</label>
    <input id=tk placeholder="AVATIX|ticketId|owner|window|signature" style="font-family:ui-monospace,monospace;font-size:13px">
-   <div class=row style="margin-top:16px"><button class=btn id=sc style="width:100%;padding:12px">🔍 Kiểm tra &amp; Check-in vé</button></div>
+   <div class=row style="margin-top:14px"><button class=btn id=sc style="width:100%;padding:12px">🔍 Kiểm tra &amp; Check-in vé</button></div>
    <div id=res class=note style="margin-top:14px"></div>
   </div>`;
-  $('#sc').onclick=scan;
+  $('#sc').onclick=()=>scan();
+  $('#btnCamStart').onclick=startCamera;
+  $('#btnCamStop').onclick=stopCamera;
  }else{
   b.innerHTML=renderHistory(hs);
  }
@@ -276,14 +294,96 @@ async function create(e){
  }catch(x){toast(x.message,1)}
 }
 
-async function scan(){
- $('#sc').disabled=true;$('#sc').textContent='Đang kiểm tra...';
+let html5QrScanner = null;
+let isScanningActive = false;
+
+function playSuccessBeep(){
  try{
-  const r=await api('scan',{token:$('#tk').value});
-  $('#res').className='note good';
-  $('#res').innerHTML=esc(r.msg)+(r.txHash?`<br>On-chain: ${txHtml(r.txHash,r.explorerUrl)}`:'');
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(880, ctx.currentTime);
+  gain.gain.setValueAtTime(0.2, ctx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.25);
+  osc.start();
+  osc.stop(ctx.currentTime + 0.25);
+ }catch(_){}
+}
+
+async function startCamera(){
+ if(typeof Html5Qrcode === 'undefined'){
+  return toast('Không thể tải thư viện quét Camera. Bạn có thể dán mã vé thủ công vào ô bên dưới.', 1);
+ }
+ const box = $('#camReader'), btnStart = $('#btnCamStart'), btnStop = $('#btnCamStop'), status = $('#camStatus');
+ if(!box) return;
+ box.style.display = 'block';
+ if(btnStart) btnStart.style.display = 'none';
+ if(btnStop) btnStop.style.display = 'block';
+ if(status) status.innerHTML = '🎥 <b>Camera đang bật.</b> Đưa mã QR của khán giả vào khung hình...';
+
+ try{
+  if(!html5QrScanner){
+   html5QrScanner = new Html5Qrcode('camReader');
+  }
+  isScanningActive = true;
+  await html5QrScanner.start(
+   { facingMode: 'environment' },
+   { fps: 10, qrbox: { width: 240, height: 240 } },
+   async (decodedText) => {
+    if(!isScanningActive) return;
+    isScanningActive = false;
+    playSuccessBeep();
+    if($('#tk')) $('#tk').value = decodedText;
+    toast('🔍 Đã nhận mã QR, đang xác thực...');
+    await scan(decodedText);
+    setTimeout(() => {
+     if(html5QrScanner && html5QrScanner.isScanning){
+      isScanningActive = true;
+     }
+    }, 3000);
+   },
+   () => {}
+  );
+ }catch(err){
+  if(status) status.textContent = '⚠️ Không thể mở camera: ' + (err.message || err);
+  if(btnStart) btnStart.style.display = 'block';
+  if(btnStop) btnStop.style.display = 'none';
+  box.style.display = 'none';
+  toast('Lỗi camera: ' + (err.message || err), 1);
+ }
+}
+
+async function stopCamera(){
+ if(html5QrScanner){
+  try{ await html5QrScanner.stop(); }catch(_){}
+ }
+ isScanningActive = false;
+ const box = $('#camReader'), btnStart = $('#btnCamStart'), btnStop = $('#btnCamStop'), status = $('#camStatus');
+ if(box) box.style.display = 'none';
+ if(btnStart) btnStart.style.display = 'block';
+ if(btnStop) btnStop.style.display = 'none';
+ if(status) status.textContent = '💡 Camera đã tắt.';
+}
+
+async function scan(tokenParam){
+ const token = tokenParam || ($('#tk') ? $('#tk').value.trim() : '');
+ if(!token) return toast('Vui lòng quét hoặc nhập mã QR vé', 1);
+ if($('#sc')){ $('#sc').disabled = true; $('#sc').textContent = 'Đang kiểm tra...'; }
+ try{
+  const r = await api('scan', { token });
+  $('#res').className = 'note good';
+  $('#res').innerHTML = `<b>✅ XÁC THỰC THÀNH CÔNG</b><br>${esc(r.msg)}` + (r.txHash ? `<br>Minh chứng On-chain: ${txHtml(r.txHash, r.explorerUrl)}` : '');
+  toast('✅ Check-in thành công!');
   load();
- }catch(x){$('#res').className='note err';$('#res').textContent=x.message}
- finally{if($('#sc')){$('#sc').disabled=false;$('#sc').textContent='🔍 Kiểm tra & Check-in vé'}}
+ }catch(x){
+  $('#res').className = 'note err';
+  $('#res').innerHTML = `<b>❌ CHECK-IN THẤT BẠI:</b> ${esc(x.message)}`;
+  toast(x.message, 1);
+ }finally{
+  if($('#sc')){ $('#sc').disabled = false; $('#sc').textContent = '🔍 Kiểm tra & Check-in vé'; }
+ }
 }
 </script>

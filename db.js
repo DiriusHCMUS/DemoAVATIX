@@ -247,4 +247,52 @@ async function _migrate(db) {
       await db.run('UPDATE events SET image=? WHERE id=?', [img, e.id]);
     }
   }
+
+  // ── Đảm bảo 2 tài khoản demo luôn sẵn sàng cho Giám khảo trải nghiệm ────
+  const crypto = require('crypto');
+  const demoAccounts = [
+    {
+      username: 'demo_organizer',
+      password: 'Demo@2025',
+      email: 'demo@avatix.vn',
+      phone: '0901234567',
+      bank: 'VietcomBank - 1234567890',
+      role: 'organizer',
+      cccd: '123456789012',
+      minBal: 10000000
+    },
+    {
+      username: 'demo_customer',
+      password: 'Demo@2025',
+      email: 'customer@avatix.vn',
+      phone: '0987654321',
+      bank: 'Vietcombank - 9876543210',
+      role: 'customer',
+      cccd: null,
+      minBal: 5000000
+    }
+  ];
+
+  for (const acc of demoAccounts) {
+    const existing = await db.get('SELECT id, balance FROM users WHERE username=?', [acc.username]);
+    if (!existing) {
+      const salt = crypto.randomBytes(16).toString('hex');
+      const passHash = crypto.scryptSync(acc.password, salt, 32).toString('hex');
+      const r = await db.run(
+        `INSERT INTO users(username,hash,salt,email,phone,bank,role,cccd,email_verified,balance)
+         VALUES(?,?,?,?,?,?,?,?,1,?)`,
+        [acc.username, passHash, salt, acc.email, acc.phone, acc.bank, acc.role, acc.cccd, acc.minBal]
+      );
+      const uid = Number(r.lastInsertRowid);
+      const secret = process.env.SECRET || 'avatix-dev-secret-doi-khi-deploy';
+      const privKey = crypto.createHmac('sha256', secret).update('wallet:' + String(uid)).digest('hex');
+      const { ethers } = require('ethers');
+      const wallet = new ethers.Wallet('0x' + privKey).address;
+      await db.run('UPDATE users SET wallet=? WHERE id=?', [wallet, uid]);
+      console.log(`[DB] ✓ Tạo tài khoản demo: ${acc.username} (${acc.role})`);
+    } else if (existing.balance < 500000) {
+      // Nạp lại tiền nếu tài khoản test bị hết tiền
+      await db.run('UPDATE users SET balance=balance+? WHERE id=?', [acc.minBal, existing.id]);
+    }
+  }
 }

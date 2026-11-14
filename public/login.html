@@ -2,6 +2,21 @@
 <body class=auth><main class="card box"><h1 class=logo style="font-size:32px"><span>AVA</span>-TIX</h1><p class=note>🎟️ Vé sự kiện chính hãng · Mã QR xoay 20s · Bảo chứng Avalanche</p>
 <div class=tabs style="margin-bottom:16px"><button id=tl class=on>🔑 Đăng nhập</button><button id=tr>✍️ Đăng ký</button></div><p id=msg class=note hidden></p>
 
+<div id=demoBox class="demo-box" style="margin-bottom:18px;padding:14px;border-radius:12px;background:rgba(255,56,92,0.06);border:1px dashed var(--tb-red)">
+  <div style="font-size:12px;font-weight:800;color:var(--tb-red);margin-bottom:8px;display:flex;align-items:center;gap:6px">
+    <span>⚡</span> TRẢI NGHIỆM NHANH (DÀNH CHO GIÁM KHẢO)
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+    <button type="button" class="btn sm" style="font-size:12px;padding:8px" onclick="quickLogin('demo_customer','Demo@2025')">
+      👤 Khách hàng (5.000.000đ)
+    </button>
+    <button type="button" class="btn sm ghost" style="font-size:12px;padding:8px" onclick="quickLogin('demo_organizer','Demo@2025')">
+      🎪 Ban tổ chức (Soát vé)
+    </button>
+  </div>
+  <div class="note" style="margin-top:6px;font-size:11px;text-align:center">Bấm 1-click để đăng nhập ngay với tài khoản mẫu</div>
+</div>
+
 <form id=fl>
   <label>Tên đăng nhập</label><input id=lu autocomplete=username required>
   <label>Mật khẩu</label><input id=lp type=password autocomplete=current-password required>
@@ -60,6 +75,7 @@ const showOtp=(box,r)=>{
   :r.maskedEmail?`<p class="note good">Đã gửi mã OTP 6 số tới <b>${esc(r.maskedEmail)}</b> (hiệu lực 5 phút).</p>`:'';
 };
 function sw(mode){
+  if($('#demoBox'))$('#demoBox').hidden=mode!=='login';
   $('#fl').hidden=mode!=='login';
   $('#fr').hidden=mode!=='register';
   $('#fv').hidden=mode!=='verify';
@@ -67,6 +83,15 @@ function sw(mode){
   $('#tl').className=mode==='login'?'on':'';
   $('#tr').className=mode==='register'?'on':'';
   msg('');
+}
+async function quickLogin(u,p){
+  $('#lu').value=u;
+  $('#lp').value=p;
+  msg('Đang đăng nhập bằng tài khoản '+u+'...','good');
+  try{
+    const d=await api('login',{username:u,password:p});
+    location='/'+d.role+'.html';
+  }catch(x){msg(x.message,'err')}
 }
 $('#tl').onclick=()=>sw('login');
 $('#tr').onclick=()=>sw('register');
